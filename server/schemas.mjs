@@ -1,0 +1,21 @@
+import { z } from 'zod';
+
+const label = z.string().trim().min(1).max(120);
+const notes = z.string().max(2000).default('');
+const email = z.email().max(254).transform(value => value.toLowerCase());
+const id = z.uuid();
+const expiry = z.number().int().positive().max(253402300799000).nullable();
+export const credentials = z.object({ email, password: z.string().min(1).max(256) }).strict();
+export const setup = credentials.extend({ password: z.string().min(14).max(256), name: label, setupToken: z.string().min(20).max(200) }).strict();
+export const productInput = z.object({ name: label, slug: z.string().min(2).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), description: notes, leaseSeconds: z.number().int().min(60).max(604800).default(3600), active: z.boolean().default(true) }).strict();
+export const customerInput = z.object({ name: label, email, externalId: z.string().trim().min(1).max(120).nullable().default(null), notes }).strict();
+export const licenseInput = z.object({ productId: id, customerId: id.nullable().default(null), label, maxDevices: z.number().int().min(1).max(10000).default(1), expiresAt: expiry.default(null), durationDays: z.number().int().min(1).max(36500).nullable().default(null), entitlements: z.array(z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.:-]+$/)).max(50).transform(values => [...new Set(values)]).default([]), notes, count: z.number().int().min(1).max(100).default(1) }).strict().refine(value => !(value.expiresAt && value.durationDays), { message: 'Choose a fixed expiry or a duration starting on first activation' });
+export const licenseEdit = z.object({ label: label.optional(), maxDevices: z.number().int().min(1).max(10000).optional(), expiresAt: expiry.optional(), entitlements: z.array(z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.:-]+$/)).max(50).optional(), notes: notes.optional(), customerId: id.nullable().optional() }).strict().refine(value => Object.keys(value).length > 0, { message: 'No changes provided' });
+export const clientInput = z.object({ productId: id, key: z.string().trim().min(10).max(128), fingerprint: z.string().min(16).max(512), name: z.string().trim().min(1).max(120).default('Unnamed device') }).strict();
+export const tokenInput = z.object({ name: label, role: z.enum(['operator','viewer']), productId: id.nullable().default(null), days: z.number().int().min(1).max(365).default(90) }).strict();
+export const userInput = z.object({ email, name: label, password: z.string().min(14).max(256), role: z.enum(['operator','viewer']) }).strict();
+export const userEdit = z.object({ role: z.enum(['operator','viewer']).optional(), disabled: z.boolean().optional() }).strict();
+export const passwordInput = z.object({ currentPassword: z.string().max(256), newPassword: z.string().min(14).max(256) }).strict();
+export const pagination = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), limit: z.coerce.number().int().min(1).max(100).default(25), search: z.string().max(120).default(''), status: z.enum(['all','active','suspended','revoked','expired','unactivated']).default('all'), productId: id.optional(), customerId: id.optional() });
+export const statusInput = z.object({ status: z.enum(['active','suspended','revoked']) }).strict();
+export const renewInput = z.object({ days: z.number().int().min(1).max(36500) }).strict();
