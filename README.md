@@ -2,7 +2,7 @@
 
 **Licensing infrastructure you own.** An MIT-licensed, self-hosted key system for software developers and tool owners.
 
-The first completed feature is the licensing API. The admin console, SDKs and deployment bundle are being built in subsequent commits. This is an early release; it has not undergone an independent security audit.
+The licensing API and JavaScript/Python clients are complete. The admin console and deployment bundle are being built in subsequent commits. This is an early release; it has not undergone an independent security audit.
 
 ## Available now
 
@@ -15,6 +15,7 @@ The first completed feature is the licensing API. The admin console, SDKs and de
 - Password hashing with scrypt, persistent login throttling, server-side sessions, CSRF protection and strict security headers.
 - Search, pagination, safe CSV export, validation aggregates and a chained HMAC audit log.
 - Optional idempotency keys for batch issuance, with encrypted response replay for 24 hours.
+- [JavaScript/TypeScript client](sdk/javascript/README.md) and [Python client](sdk/python/README.md) that verify signatures, application/device binding and expiry before granting entitlements.
 
 ## Run the API
 

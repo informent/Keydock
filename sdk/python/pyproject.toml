@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keydock-client"
+version = "0.1.0"
+description = "Keydock licensing client with pinned Ed25519 lease verification"
+requires-python = ">=3.11"
+dependencies = ["cryptography>=46,<49"]
+license = "MIT"
+readme = "README.md"
+
+[tool.setuptools]
+py-modules = ["keydock"]

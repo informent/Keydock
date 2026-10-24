@@ -56,17 +56,4 @@ export function publicJwk(identity) {
   return { ...createPublicKey(identity.signing.publicKey).export({ format: 'jwk' }), kid: identity.signing.kid, alg: 'EdDSA', use: 'sig' };
 }
 
-export function verifyLease(token, publicKey, { productId, fingerprint, issuer, now = Date.now(), maxClockSkewSeconds = 30 }) {
-  if (typeof token !== 'string' || token.length > 32768) throw new Error('Invalid lease');
-  const parts = token.split('.');
-  if (parts.length !== 3 || parts.some(x => !/^[A-Za-z0-9_-]+$/.test(x))) throw new Error('Invalid lease');
-  const [header, payload, signature] = parts;
-  const h = JSON.parse(Buffer.from(header, 'base64url').toString());
-  if (h.alg !== 'EdDSA' || h.typ !== 'JWT' || h.crit !== undefined || h.kid !== sha256(publicKey).slice(0, 16)) throw new Error('Untrusted signing key');
-  if (!verify(null, Buffer.from(`${header}.${payload}`), publicKey, Buffer.from(signature, 'base64url'))) throw new Error('Invalid signature');
-  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString());
-  const time = Math.floor(now / 1000);
-  if (!productId || !fingerprint || !issuer || claims.aud !== productId || claims.iss !== issuer || claims.device !== sha256(fingerprint)) throw new Error('Lease does not match this application or device');
-  if (claims.v !== 1 || !Number.isInteger(claims.iat) || !Number.isInteger(claims.nbf) || !Number.isInteger(claims.exp) || claims.exp <= time || claims.nbf > time + maxClockSkewSeconds || claims.iat > time + maxClockSkewSeconds || claims.exp <= claims.iat || typeof claims.sub !== 'string' || typeof claims.activationId !== 'string' || !Array.isArray(claims.entitlements) || claims.entitlements.some(x => typeof x !== 'string')) throw new Error('Expired or malformed lease');
-  return claims;
-}
+export { verifyLease } from '../sdk/javascript/lease.mjs';

@@ -1,0 +1,12 @@
+{
+  "name": "@keydock/client",
+  "version": "0.1.0",
+  "description": "Keydock licensing client with pinned Ed25519 lease verification",
+  "type": "module",
+  "main": "index.mjs",
+  "types": "index.d.ts",
+  "exports": { ".": { "types": "./index.d.ts", "import": "./index.mjs" } },
+  "files": ["index.mjs", "lease.mjs", "index.d.ts", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

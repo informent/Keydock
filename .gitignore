@@ -12,3 +12,7 @@ playwright-report/
 backups/
 .12ui/
 12ui-runs/
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
