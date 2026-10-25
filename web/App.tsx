@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Activity,
   ArrowRight,
@@ -15,12 +15,15 @@ import {
   LogOut,
   Menu,
   Settings,
+  Search,
   ShieldCheck,
   Users,
   X,
 } from "lucide-react";
 import { api, message, setCsrf, useLoad } from "./api";
 import { Brand, ErrorBox, Field, Loading } from "./components";
+import { CommandPalette } from "./CommandPalette";
+import { ThemeToggle } from "./theme";
 import {
   IssueLicense,
   LicenseDetail,
@@ -159,6 +162,9 @@ function Authentication({
   }
   return (
     <main className="auth-layout">
+      <div className="auth-appearance">
+        <ThemeToggle />
+      </div>
       <section className="auth-intro">
         <Brand />
         <div className="auth-story">
@@ -186,6 +192,21 @@ function Authentication({
             <span>
               <Code2 size={19} />
               Open source, all the way
+            </span>
+          </div>
+          <div className="auth-network" aria-hidden="true">
+            <span className="network-node">
+              <Box size={19} />
+              <small>Your app</small>
+            </span>
+            <span className="network-path" />
+            <span className="network-hub">
+              <KeyRound size={27} />
+            </span>
+            <span className="network-path" />
+            <span className="network-node">
+              <ShieldCheck size={19} />
+              <small>Signed access</small>
             </span>
           </div>
         </div>
@@ -323,6 +344,7 @@ function Console({
     location.hash.replace(/^#\/?/, "").split("?")[0] || "overview";
   const [route, setRoute] = useState(readRoute),
     [mobile, setMobile] = useState(false),
+    [command, setCommand] = useState(false),
     [revision, setRevision] = useState(0),
     [issue, setIssue] = useState(false),
     [productForm, setProductForm] = useState<Product | "new" | null>(null),
@@ -337,6 +359,7 @@ function Console({
       kind: "success" | "error";
     } | null>(null),
     [signingOut, setSigningOut] = useState(false);
+  const sidebar = useRef<HTMLElement>(null);
   const products = useLoad<{ items: Product[] }>("/admin/products", revision),
     canWrite = session.user.role !== "viewer",
     isOwner = session.user.role === "owner";
@@ -356,19 +379,87 @@ function Console({
   useEffect(() => {
     document.title = `${navigation.find((item) => item.id === route)?.label ?? "Not found"} · Keydock`;
   }, [route]);
+  useEffect(() => {
+    const shortcuts = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        !event.altKey
+      ) {
+        if (document.querySelector("dialog[open]") && !command) return;
+        event.preventDefault();
+        setMobile(false);
+        setCommand((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", shortcuts);
+    return () => window.removeEventListener("keydown", shortcuts);
+  }, [command]);
+  useEffect(() => {
+    if (!mobile) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      [
+        ...(sidebar.current?.querySelectorAll<HTMLElement>(
+          "a[href], button:not([disabled])",
+        ) ?? []),
+      ].filter((element) => element.getClientRects().length);
+    sidebar.current
+      ?.querySelector<HTMLElement>('a[aria-current="page"]')
+      ?.focus();
+    document.body.classList.add("navigation-open");
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobile(false);
+      }
+      if (event.key === "Tab") {
+        const items = focusable(),
+          first = items[0],
+          last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    const wide = matchMedia("(min-width: 901px)");
+    const resize = () => {
+      if (wide.matches) setMobile(false);
+    };
+    window.addEventListener("keydown", handle);
+    wide.addEventListener("change", resize);
+    return () => {
+      document.body.classList.remove("navigation-open");
+      window.removeEventListener("keydown", handle);
+      wide.removeEventListener("change", resize);
+      previous?.focus();
+    };
+  }, [mobile]);
   const notify: Notify = (text, kind = "success") => setToast({ text, kind });
   const refresh = () => setRevision((value) => value + 1),
     openIssue = () => setIssue(true),
     openProduct = () => setProductForm("new"),
     openLicense = (license: License) => setSelected(license.id);
   const common = { revision, canWrite, notify },
-    productList = products.data?.items ?? [];
+    productList = products.data?.items ?? [],
+    initials = session.user.name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
   let content;
   switch (route) {
     case "overview":
       content = (
         <OverviewPage
           {...common}
+          userName={session.user.name}
           onIssue={openIssue}
           onProduct={openProduct}
           onSelect={openLicense}
@@ -443,7 +534,14 @@ function Console({
   }
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
         Skip to content
       </a>
       {mobile && (
@@ -453,7 +551,11 @@ function Console({
           onClick={() => setMobile(false)}
         />
       )}
-      <aside className={`sidebar ${mobile ? "open" : ""}`}>
+      <aside
+        ref={sidebar}
+        className={`sidebar ${mobile ? "open" : ""}`}
+        aria-label="Workspace sidebar"
+      >
         <div className="sidebar-brand">
           <Brand small />
           <button
@@ -489,6 +591,17 @@ function Console({
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <div className="instance-card">
+            <ShieldCheck size={19} />
+            <strong>
+              Your infrastructure.
+              <br />
+              Your rules.
+            </strong>
+            <a href="#/settings" onClick={() => setMobile(false)}>
+              Manage instance <ArrowRight size={14} />
+            </a>
+          </div>
           <a
             className="sidebar-docs"
             href="https://github.com/informent/Keydock"
@@ -500,9 +613,7 @@ function Console({
             <ExternalLink size={13} />
           </a>
           <div className="sidebar-user">
-            <span className="avatar">
-              {session.user.name.slice(0, 2).toUpperCase()}
-            </span>
+            <span className="avatar">{initials}</span>
             <div>
               <strong>{session.user.name}</strong>
               <span>{session.user.role}</span>
@@ -527,7 +638,7 @@ function Console({
           </div>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={mobile}>
         <header className="topbar">
           <div>
             <button
@@ -545,11 +656,29 @@ function Console({
             </span>
           </div>
           <div className="topbar-meta">
+            <button
+              className="command-trigger"
+              onClick={() => setCommand(true)}
+              aria-label="Search workspace"
+              aria-keyshortcuts="Control+k Meta+k"
+            >
+              <Search size={16} />
+              <span>Search workspace</span>
+              <kbd>
+                {/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K"}
+              </kbd>
+            </button>
+            <ThemeToggle />
             <span className="self-hosted">
               <span />
               Self-hosted
             </span>
-            <span className="version">v{meta.version}</span>
+            <span
+              className="topbar-avatar"
+              aria-label={`${session.user.name}, ${session.user.role}`}
+            >
+              {initials}
+            </span>
           </div>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>
@@ -568,6 +697,17 @@ function Console({
           </footer>
         </main>
       </div>
+      {command && (
+        <CommandPalette
+          pages={navigation}
+          canWrite={canWrite}
+          onClose={() => setCommand(false)}
+          onIssue={openIssue}
+          onProduct={openProduct}
+          onCustomer={() => setCustomerForm("new")}
+          onSelect={openLicense}
+        />
+      )}
       {issue && (
         <IssueLicense
           products={productList}

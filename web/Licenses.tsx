@@ -8,7 +8,15 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { api, date, dateTime, download, useLoad } from "./api";
+import {
+  api,
+  date,
+  dateTime,
+  download,
+  number,
+  useDebouncedValue,
+  useLoad,
+} from "./api";
 import {
   Badge,
   Confirm,
@@ -66,7 +74,7 @@ export function Licenses({
     [product, setProduct] = useState(""),
     [page, setPage] = useState(1);
   const query = new URLSearchParams({
-    search,
+    search: useDebouncedValue(search),
     status,
     page: String(page),
     ...(product ? { productId: product } : {}),
@@ -125,7 +133,7 @@ export function Licenses({
                 setPage(1);
               }}
             >
-              All licenses{result.data && <span>{result.data.total}</span>}
+              All licenses{stats.data && <span>{stats.data.licenses}</span>}
             </button>
             <button
               className={status === "active" ? "active" : ""}
@@ -207,8 +215,32 @@ export function Licenses({
             </select>
           </div>
         </div>
+        {(search || status !== "all" || product) && (
+          <div className="active-filters">
+            <span>Filtered view</span>
+            {search && <span className="filter-chip">Search: {search}</span>}
+            {status !== "all" && <span className="filter-chip">{status}</span>}
+            {product && (
+              <span className="filter-chip">
+                {products.find((item) => item.id === product)?.name ??
+                  "Selected product"}
+              </span>
+            )}
+            <button
+              className="text-link"
+              onClick={() => {
+                setSearch("");
+                setStatus("all");
+                setProduct("");
+                setPage(1);
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
         <ErrorBox error={result.error} />
-        {result.loading ? (
+        {result.loading && !result.data ? (
           <Loading />
         ) : result.data?.items.length ? (
           <LicenseTable items={result.data.items} onSelect={onSelect} />
@@ -261,19 +293,68 @@ export function IssueLicense({
   onProduct: () => void;
 }) {
   const [mode, setMode] = useState("lifetime"),
-    [customerSearch, setCustomerSearch] = useState("");
+    [issuing, setIssuing] = useState(false),
+    [customerSearch, setCustomerSearch] = useState(""),
+    [assignedCustomer, setAssignedCustomer] = useState<Customer | null>(null),
+    [draft, setDraft] = useState({
+      productId: products.find((product) => product.active)?.id ?? "",
+      label: "",
+      maxDevices: "1",
+      count: "1",
+      expiresAt: "",
+      durationDays: "30",
+      entitlements: "",
+    });
+  const customerQuery = useDebouncedValue(customerSearch);
   const customers = useLoad<Page<Customer>>(
-    `/admin/customers?limit=100&search=${encodeURIComponent(customerSearch)}`,
+    `/admin/customers?limit=100&search=${encodeURIComponent(customerQuery)}`,
   );
   const retry = useRef({ body: "", key: "" });
-  if (!products.length)
+  const activeProducts = products.filter((product) => product.active),
+    selectedProduct =
+      activeProducts.find((product) => product.id === draft.productId) ??
+      activeProducts[0],
+    customerOptions = customers.data?.items ?? [],
+    entitlements = entitlementList(draft.entitlements),
+    keys = Number(draft.count),
+    devices = Number(draft.maxDevices),
+    days = Number(draft.durationDays),
+    fixedExpiry = new Date(draft.expiresAt).getTime(),
+    validKeys = Number.isInteger(keys) && keys >= 1 && keys <= 100,
+    validDevices =
+      Number.isInteger(devices) && devices >= 1 && devices <= 10000;
+  const leaseSeconds = selectedProduct?.leaseSeconds ?? 0,
+    leaseUnit =
+      leaseSeconds % 86400 === 0
+        ? "day"
+        : leaseSeconds % 3600 === 0
+          ? "hour"
+          : leaseSeconds % 60 === 0
+            ? "minute"
+            : "second",
+    leaseAmount =
+      leaseSeconds /
+      { day: 86400, hour: 3600, minute: 60, second: 1 }[leaseUnit];
+  const validity =
+    mode === "lifetime"
+      ? "Lifetime · no expiry"
+      : mode === "fixed"
+        ? Number.isFinite(fixedExpiry)
+          ? dateTime(fixedExpiry)
+          : "Choose an expiry date"
+        : Number.isInteger(days) && days >= 1 && days <= 36500
+          ? `${number(days)} ${days === 1 ? "day" : "days"} from first activation`
+          : "Choose a valid duration";
+  const updateDraft = (field: keyof typeof draft, value: string) =>
+    setDraft((current) => ({ ...current, [field]: value }));
+  if (!activeProducts.length)
     return (
       <Modal title="Add a product first" onClose={onClose}>
         <div className="modal-body">
           <Empty
             icon={<KeyRound />}
             title="Give your licenses a home"
-            text="A product connects your application, its license keys, and its offline policy."
+            text="Create or enable a product before issuing keys. A product connects your application, its licenses, and its offline policy."
             action={
               <button className="button primary" onClick={onProduct}>
                 Create product
@@ -289,9 +370,12 @@ export function IssueLicense({
       title="Issue a license"
       description="Set the terms. Keydock takes care of the key."
       onClose={onClose}
+      className="issue-modal"
+      busy={issuing}
     >
       <Form
         submit="Generate license keys"
+        onBusyChange={setIssuing}
         onClose={onClose}
         onSubmit={async (data) => {
           const input = {
@@ -320,121 +404,245 @@ export function IssueLicense({
           onIssued(result.items);
         }}
       >
-        <Field label="Product">
-          <select name="productId" required>
-            {products
-              .filter((p) => p.active)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </Field>
-        <Field label="License label">
-          <input
-            name="label"
-            placeholder="e.g. Pro annual · Acme"
-            maxLength={120}
-            required
-            autoFocus
-          />
-        </Field>
-        <div className="field-row">
-          <Field
-            label="Device limit"
-            hint="Concurrent activated installations."
-          >
-            <input
-              type="number"
-              name="maxDevices"
-              min={1}
-              max={10000}
-              defaultValue={1}
-              required
-            />
-          </Field>
-          <Field label="Number of keys" hint="Generate up to 100 at once.">
-            <input
-              type="number"
-              name="count"
-              min={1}
-              max={100}
-              defaultValue={1}
-              required
-            />
-          </Field>
-        </div>
-        <Field label="Validity">
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="lifetime">Lifetime · no expiry</option>
-            <option value="fixed">Expires at a fixed date</option>
-            <option value="activation">Starts on first activation</option>
-          </select>
-        </Field>
-        {mode === "fixed" && (
-          <Field label="Expires at (your local time)">
-            <input
-              type="datetime-local"
-              name="expiresAt"
-              required
-              min={localDate(Date.now())}
-            />
-          </Field>
-        )}
-        {mode === "activation" && (
-          <Field label="Days after first activation">
-            <input
-              type="number"
-              name="durationDays"
-              min={1}
-              max={36500}
-              defaultValue={30}
-              required
-            />
-          </Field>
-        )}
-        <Field label="Find customer (optional)">
-          <input
-            placeholder="Search by name or email"
-            value={customerSearch}
-            onChange={(e) => setCustomerSearch(e.target.value)}
-          />
-        </Field>
-        <Field label="Assign customer">
-          <select name="customerId">
-            <option value="">Unassigned</option>
-            {customers.data?.items.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.email}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field
-          label="Entitlements"
-          hint="Feature names separated by commas. Example: pro, export, cloud_sync"
-        >
-          <input
-            name="entitlements"
-            placeholder="pro, export"
-            maxLength={2000}
-          />
-        </Field>
-        <Field label="Private notes">
-          <textarea
-            name="notes"
-            rows={2}
-            maxLength={2000}
-            placeholder="Visible to your team only"
-          />
-        </Field>
-        <div className="callout">
-          <ShieldCheck size={18} />
-          <span>
-            Copy or download the keys after creation. They will not appear in
-            license records.
-          </span>
+        <div className="issue-layout">
+          <div className="issue-fields">
+            <div className="form-section-heading">
+              <span>01</span>
+              <div>
+                <h3>License basics</h3>
+                <p>Choose the product and the capacity for each key.</p>
+              </div>
+            </div>
+            <Field label="Product">
+              <select
+                name="productId"
+                required
+                value={selectedProduct.id}
+                onChange={(event) =>
+                  updateDraft("productId", event.target.value)
+                }
+              >
+                {activeProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="License label">
+              <input
+                name="label"
+                value={draft.label}
+                onChange={(event) => updateDraft("label", event.target.value)}
+                placeholder="e.g. Pro annual · Acme"
+                maxLength={120}
+                required
+                autoFocus
+              />
+            </Field>
+            <div className="field-row">
+              <Field
+                label="Device limit"
+                hint="Concurrent activated installations."
+              >
+                <input
+                  type="number"
+                  name="maxDevices"
+                  min={1}
+                  max={10000}
+                  value={draft.maxDevices}
+                  onChange={(event) =>
+                    updateDraft("maxDevices", event.target.value)
+                  }
+                  required
+                />
+              </Field>
+              <Field label="Number of keys" hint="Generate up to 100 at once.">
+                <input
+                  type="number"
+                  name="count"
+                  min={1}
+                  max={100}
+                  value={draft.count}
+                  onChange={(event) => updateDraft("count", event.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+            <div className="form-section-heading">
+              <span>02</span>
+              <div>
+                <h3>Access and ownership</h3>
+                <p>Set the terms and connect the license to a customer.</p>
+              </div>
+            </div>
+            <Field label="Validity">
+              <select value={mode} onChange={(e) => setMode(e.target.value)}>
+                <option value="lifetime">Lifetime · no expiry</option>
+                <option value="fixed">Expires at a fixed date</option>
+                <option value="activation">Starts on first activation</option>
+              </select>
+            </Field>
+            {mode === "fixed" && (
+              <Field label="Expires at (your local time)">
+                <input
+                  type="datetime-local"
+                  name="expiresAt"
+                  value={draft.expiresAt}
+                  onChange={(event) =>
+                    updateDraft("expiresAt", event.target.value)
+                  }
+                  required
+                  min={localDate(Date.now())}
+                />
+              </Field>
+            )}
+            {mode === "activation" && (
+              <Field label="Days after first activation">
+                <input
+                  type="number"
+                  name="durationDays"
+                  min={1}
+                  max={36500}
+                  value={draft.durationDays}
+                  onChange={(event) =>
+                    updateDraft("durationDays", event.target.value)
+                  }
+                  required
+                />
+              </Field>
+            )}
+            <Field label="Find customer (optional)">
+              <input
+                placeholder="Search by name or email"
+                maxLength={120}
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+              />
+            </Field>
+            <Field label="Assign customer">
+              <select
+                name="customerId"
+                value={assignedCustomer?.id ?? ""}
+                onChange={(event) =>
+                  setAssignedCustomer(
+                    customerOptions.find(
+                      (customer) => customer.id === event.target.value,
+                    ) ??
+                      (event.target.value === assignedCustomer?.id
+                        ? assignedCustomer
+                        : null),
+                  )
+                }
+              >
+                <option value="">Unassigned</option>
+                {assignedCustomer &&
+                  !customerOptions.some(
+                    (customer) => customer.id === assignedCustomer.id,
+                  ) && (
+                    <option value={assignedCustomer.id}>
+                      {assignedCustomer.name} · {assignedCustomer.email}
+                    </option>
+                  )}
+                {customerOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.email}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <ErrorBox error={customers.error} />
+            <Field
+              label="Entitlements"
+              hint="Feature names separated by commas. Example: pro, export, cloud_sync"
+            >
+              <input
+                name="entitlements"
+                value={draft.entitlements}
+                onChange={(event) =>
+                  updateDraft("entitlements", event.target.value)
+                }
+                placeholder="pro, export"
+                maxLength={2000}
+              />
+            </Field>
+            <Field label="Private notes">
+              <textarea
+                name="notes"
+                rows={2}
+                maxLength={2000}
+                placeholder="Visible to your team only"
+              />
+            </Field>
+          </div>
+          <aside className="issue-preview" aria-label="Issuance summary">
+            <div className="preview-kicker">
+              <KeyRound size={17} />
+              <span>BEFORE YOU ISSUE</span>
+            </div>
+            <h3>Issuance summary</h3>
+            <p className="preview-label">
+              {draft.label.trim() || "Your next license"}
+            </p>
+            <span className="product-tag">{selectedProduct.name}</span>
+            <div className="preview-capacity">
+              <div>
+                <strong>{validKeys ? number(keys) : "—"}</strong>
+                <span>{keys === 1 ? "license key" : "license keys"}</span>
+              </div>
+              <div>
+                <strong>{validDevices ? number(devices) : "—"}</strong>
+                <span>
+                  {devices === 1 ? "device per key" : "devices per key"}
+                </span>
+              </div>
+            </div>
+            <dl>
+              <dt>Validity</dt>
+              <dd>{validity}</dd>
+              <dt>Customer</dt>
+              <dd>{assignedCustomer?.name ?? "Unassigned"}</dd>
+              <dt>Offline lease</dt>
+              <dd>
+                {number(leaseAmount)} {leaseUnit}
+                {leaseAmount === 1 ? "" : "s"}
+              </dd>
+              <dt>Capacity across this batch</dt>
+              <dd>
+                {validKeys && validDevices
+                  ? `${number(keys * devices)} device ${keys * devices === 1 ? "slot" : "slots"}`
+                  : "Choose valid key and device counts"}
+              </dd>
+            </dl>
+            <div className="preview-entitlements">
+              <span>Entitlements</span>
+              <div>
+                {entitlements.length ? (
+                  entitlements
+                    .slice(0, 8)
+                    .map((entitlement, index) => (
+                      <code key={`${entitlement}-${index}`}>{entitlement}</code>
+                    ))
+                ) : (
+                  <p>None configured</p>
+                )}
+                {entitlements.length > 8 && (
+                  <small>+{entitlements.length - 8} more</small>
+                )}
+              </div>
+            </div>
+            <p className="preview-note">
+              Each key has its own device limit. Offline access lasts until the
+              signed lease expires.
+            </p>
+            <div className="callout">
+              <ShieldCheck size={18} />
+              <span>
+                Copy or download the keys after creation. They will not appear
+                in license records.
+              </span>
+            </div>
+          </aside>
         </div>
       </Form>
     </Modal>

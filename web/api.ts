@@ -63,7 +63,7 @@ export async function api<T>(
   return data;
 }
 export function useLoad<T>(path: string | null, revision = 0) {
-  const [data, setData] = useState<T | null>(null),
+  const [loaded, setLoaded] = useState<{ path: string; data: T } | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [attempt, setAttempt] = useState(0);
@@ -71,7 +71,7 @@ export function useLoad<T>(path: string | null, revision = 0) {
   useEffect(() => {
     if (!path) {
       setLoading(false);
-      setData(null);
+      setLoaded(null);
       return;
     }
     const abort = new AbortController();
@@ -79,7 +79,7 @@ export function useLoad<T>(path: string | null, revision = 0) {
     setError("");
     api<T>(path, { signal: abort.signal })
       .then((value) => {
-        if (!abort.signal.aborted) setData(value);
+        if (!abort.signal.aborted) setLoaded({ path, data: value });
       })
       .catch((error) => {
         if (!abort.signal.aborted) setError(error.message);
@@ -89,10 +89,24 @@ export function useLoad<T>(path: string | null, revision = 0) {
       });
     return () => abort.abort();
   }, [path, revision, attempt]);
-  return { data, error, loading, reload };
+  return {
+    data: loaded?.data ?? null,
+    dataPath: loaded?.path ?? null,
+    error,
+    loading,
+    reload,
+  };
 }
 export const message = (error: unknown) =>
   error instanceof Error ? error.message : "Something went wrong. Try again.";
+export function useDebouncedValue<T>(value: T, delay = 200) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
 export const date = (value: number | null | undefined) =>
   value
     ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(value)
