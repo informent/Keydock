@@ -18,10 +18,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run verify
+      - run: npm audit --audit-level=high
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
       - run: python -m pip install ./sdk/python
       - run: python -m unittest discover -s sdk/python -p test_keydock.py -v
+      - run: npx playwright install --with-deps chromium
+        if: runner.os == 'Linux'
+      - run: node scripts/ui-smoke.mjs

@@ -1,25 +1,72 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { createIdentity, digest } from './crypto.mjs';
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { createIdentity, digest, validateIdentity } from "./crypto.mjs";
+
+export const RESTORE_MARKER = ".keydock-restore-in-progress";
+
+export function verifyAudit(db, identity) {
+  let previous = "GENESIS",
+    checked = 0;
+  for (const row of db.prepare("SELECT * FROM audit ORDER BY seq").iterate()) {
+    const entry = {
+      id: row.id,
+      action: row.action,
+      actor: row.actor,
+      target: row.target,
+      detail: row.detail,
+      created_at: row.created_at,
+      previous_hash: row.previous_hash,
+    };
+    if (
+      row.previous_hash !== previous ||
+      digest(JSON.stringify(entry), identity.pepper) !== row.hash
+    )
+      return { valid: false, checked, failedAt: row.seq };
+    previous = row.hash;
+    checked++;
+  }
+  return { valid: true, checked, head: previous };
+}
 
 export function openStore(directory, clock = () => Date.now()) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const identityPath = join(directory, 'identity.json');
-  const databasePath = join(directory, 'keydock.sqlite');
+  if (existsSync(join(directory, RESTORE_MARKER)))
+    throw new Error(
+      "Incomplete restore. Restore the backup into a new directory before starting Keydock.",
+    );
+  const identityPath = join(directory, "identity.json");
+  const databasePath = join(directory, "keydock.sqlite");
   if (!existsSync(identityPath)) {
-    if (existsSync(databasePath)) throw new Error('Missing identity.json. Restore the identity matching this database; a replacement would invalidate credentials.');
-    try { writeFileSync(identityPath, `${JSON.stringify(createIdentity(), null, 2)}\n`, { flag: 'wx', mode: 0o600 }); }
-    catch (error) { if (error.code !== 'EEXIST') throw error; }
+    if (existsSync(databasePath))
+      throw new Error(
+        "Missing identity.json. Restore the identity matching this database; a replacement would invalidate credentials.",
+      );
+    try {
+      writeFileSync(
+        identityPath,
+        `${JSON.stringify(createIdentity(), null, 2)}\n`,
+        { flag: "wx", mode: 0o600 },
+      );
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
   }
-  const identity = JSON.parse(readFileSync(identityPath, 'utf8'));
-  if (identity.version !== 1 || !identity.pepper || !identity.signing?.privateKey || !identity.setupToken) throw new Error('Invalid identity file');
+  const identity = validateIdentity(
+    JSON.parse(readFileSync(identityPath, "utf8")),
+  );
   const db = new DatabaseSync(databasePath, { timeout: 5000 });
-  db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
-  const schemaVersion = db.prepare('PRAGMA user_version').get().user_version;
-  if (schemaVersion > 1) { db.close(); throw new Error('This database requires a newer Keydock version.'); }
-  if (schemaVersion === 0) db.exec(`
+  db.exec(
+    "PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;",
+  );
+  const schemaVersion = db.prepare("PRAGMA user_version").get().user_version;
+  if (schemaVersion > 1) {
+    db.close();
+    throw new Error("This database requires a newer Keydock version.");
+  }
+  if (schemaVersion === 0)
+    db.exec(`
     BEGIN IMMEDIATE;
     CREATE TABLE users(id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','operator','viewer')), disabled INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
     CREATE TABLE sessions(hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -40,22 +87,46 @@ export function openStore(directory, clock = () => Date.now()) {
     COMMIT;
   `);
   const store = {
-    db, identity, directory, clock,
+    db,
+    identity,
+    directory,
+    clock,
     get: (sql, ...args) => db.prepare(sql).get(...args),
     all: (sql, ...args) => db.prepare(sql).all(...args),
     run: (sql, ...args) => db.prepare(sql).run(...args),
     transaction(fn) {
-      db.exec('BEGIN IMMEDIATE');
-      try { const result = fn(); if (result?.then) throw new Error('Transactions must be synchronous'); db.exec('COMMIT'); return result; }
-      catch (error) { db.exec('ROLLBACK'); throw error; }
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = fn();
+        if (result?.then) throw new Error("Transactions must be synchronous");
+        db.exec("COMMIT");
+        return result;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
     audit(action, actor, target, detail = {}) {
-      const previous = store.get('SELECT hash FROM audit ORDER BY seq DESC LIMIT 1')?.hash ?? 'GENESIS';
-      const entry = { id: randomUUID(), action, actor, target, detail: JSON.stringify(detail), created_at: clock(), previous_hash: previous };
+      const previous =
+        store.get("SELECT hash FROM audit ORDER BY seq DESC LIMIT 1")?.hash ??
+        "GENESIS";
+      const entry = {
+        id: randomUUID(),
+        action,
+        actor,
+        target,
+        detail: JSON.stringify(detail),
+        created_at: clock(),
+        previous_hash: previous,
+      };
       const hash = digest(JSON.stringify(entry), identity.pepper);
-      store.run('INSERT INTO audit(id,action,actor,target,detail,created_at,previous_hash,hash) VALUES(?,?,?,?,?,?,?,?)', ...Object.values(entry), hash);
+      store.run(
+        "INSERT INTO audit(id,action,actor,target,detail,created_at,previous_hash,hash) VALUES(?,?,?,?,?,?,?,?)",
+        ...Object.values(entry),
+        hash,
+      );
     },
-    close: () => db.close()
+    close: () => db.close(),
   };
   return store;
 }
