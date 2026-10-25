@@ -4,13 +4,17 @@
 
 Keydock includes a responsive admin console, licensing API, and JavaScript/Python clients. This is an early release; it has not undergone an independent security audit.
 
-![Keydock license workspace](docs/images/licenses.png)
+![Keydock workspace overview](docs/images/overview.png)
 
 _The console connected to a real local instance with illustrative customer and license records._
+
+[License workspace](docs/images/licenses.png) · [Dark theme](docs/images/dark.png) · [Mobile](docs/images/mobile.png) · [Command search](docs/images/command-search.png)
 
 ## Available now
 
 - A responsive console with guided owner setup, overview, licenses, products, customers, activity, developer integration and team settings.
+- Light and dark themes, keyboard workspace search, interactive request history, and mobile license cards.
+- A live issuance summary for product, customer, expiry, entitlements, and device capacity before creating a batch.
 - Products, customers and batch license issuance (up to 100 keys per request).
 - 192-bit random license keys, HMAC-hashed storage, rotation, suspension, permanent revocation and renewal.
 - Device limits enforced inside SQLite write transactions; idempotent activation and device release.
@@ -41,6 +45,16 @@ Open `http://127.0.0.1:3400`. First startup creates `data/identity.json` and `da
 To explore a populated workspace, run `npm run demo` after building. It listens at `http://127.0.0.1:3401`, creates a random owner password, and prints the path to a private credentials file. Production environment settings are ignored. Ctrl+C closes the demo and removes its temporary data. Use `npm run demo -- --port 3402` to choose another local port.
 
 Create a backup with `npm run backup`, check it with `npm run backup:verify -- BACKUP_DIRECTORY`, and restore it with `npm run restore -- BACKUP_DIRECTORY --to NEW_DATA_DIRECTORY`. The restore destination must not exist and its parent must already exist. Backups contain private identity material; see [storage and recovery](docs/operations.md#storage-and-recovery) for configuration and recovery steps.
+
+## In the console
+
+Press **Ctrl+K** (Windows/Linux) or **⌘K** (Mac) to jump to a page, find a license by label or customer, or start an action allowed by your role. Use the arrow keys and Enter to select a result; Escape closes the dialog and returns focus. License search begins after two characters.
+
+The theme button switches between light and dark appearances. Your first visit follows the browser's preferred color scheme; your choice is then saved in that browser and shared across tabs. On phones, licenses become readable cards with the same details and actions as the desktop table.
+
+The overview shows actual activation and validation counts over seven or fourteen days. Hover over the chart, or focus it and use the arrow keys, to inspect daily totals. The license workspace includes product/status filters, customer search, and a single **Clear filters** action.
+
+License creation includes a live [issuance summary](docs/images/issue-license.png). Review the number of keys, devices per key, total device capacity, validity, customer, entitlements, and the product's offline lease duration before generating the batch. Searching for another customer preserves your current assignment until you change it.
 
 ## API
 
@@ -75,10 +89,10 @@ The audit chain detects changes to retained records using the instance secret. D
 npm test
 npm run typecheck
 npm run build
-node scripts/ui-smoke.mjs
+npm run test:ui
 ```
 
-Tests cover concurrent device allocation, lifecycle transitions, signed lease tampering, expiry, CSRF, role and product boundaries, key rotation, encrypted idempotency replay, session invalidation, live backup recovery, damaged backup rejection, and demo isolation. The browser check runs headlessly, exercises the complete setup-to-device-release workflow, and checks mobile layout and browser errors. Install Chromium with `npx playwright install chromium` on Linux; Windows uses Edge when available. See [operations](docs/operations.md) for deployment details.
+Tests cover concurrent device allocation, lifecycle transitions, signed lease tampering, expiry, CSRF, role and product boundaries, key rotation, encrypted idempotency replay, session invalidation, live backup recovery, damaged backup rejection, and demo isolation. The browser checks exercise the complete setup-to-device-release workflow, keyboard search and focus, theme persistence and contrast, viewer permissions, and every console page at widths from 320 to 1440 pixels. Both themes are checked on desktop and mobile. Install Chromium with `npx playwright install chromium` on Linux; Windows uses Edge when available. See [operations](docs/operations.md) for deployment details.
 
 ## References and attribution
 

@@ -3,6 +3,7 @@ import {
   isValidElement,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -20,6 +21,9 @@ import {
   X,
   KeyRound,
   ChevronRight,
+  Monitor,
+  Clock3,
+  Box,
 } from "lucide-react";
 import { date, message, number } from "./api";
 import type { License, Notify, Overview } from "./types";
@@ -121,6 +125,7 @@ export function SearchInput({
       <input
         aria-label={placeholder}
         placeholder={placeholder}
+        maxLength={120}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -224,6 +229,7 @@ export function Modal({
   onClose,
   wide = false,
   busy = false,
+  className = "",
 }: {
   title: string;
   description?: string;
@@ -231,18 +237,30 @@ export function Modal({
   onClose: () => void;
   wide?: boolean;
   busy?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     close = useRef(onClose);
   close.current = onClose;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = ref.current;
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     dialog?.showModal();
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      queueMicrotask(() => {
+        const top = [...document.querySelectorAll("dialog[open]")].at(-1);
+        if (previous?.isConnected && (!top || top.contains(previous)))
+          previous.focus({ preventScroll: true });
+      });
+    };
   }, []);
   return (
     <dialog
-      className={`modal ${wide ? "wide" : ""}`}
+      className={`modal ${wide ? "wide" : ""} ${className}`}
       ref={ref}
       aria-label={title}
       onCancel={(event) => {
@@ -324,6 +342,7 @@ export function Form({
   onClose,
   footer,
   readOnly = false,
+  onBusyChange,
 }: {
   children: ReactNode;
   onSubmit: (data: FormData) => Promise<void>;
@@ -331,6 +350,7 @@ export function Form({
   onClose: () => void;
   footer?: ReactNode;
   readOnly?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -339,6 +359,7 @@ export function Form({
     if (busy) return;
     const data = new FormData(event.currentTarget);
     setBusy(true);
+    onBusyChange?.(true);
     setError("");
     try {
       await onSubmit(data);
@@ -346,6 +367,7 @@ export function Form({
       setError(message(error));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
   return (
@@ -406,31 +428,35 @@ export function Stats({ data }: { data: Overview | null }) {
           value: data?.active,
           detail: "Ready to validate",
           tone: "green",
+          icon: KeyRound,
         },
         {
           label: "Activated devices",
           value: data?.devices,
           detail: "Currently occupying seats",
           tone: "blue",
+          icon: Monitor,
         },
         {
           label: "Expiring soon",
           value: data?.expiring,
           detail: "In the next 7 days",
           tone: "amber",
+          icon: Clock3,
         },
         {
           label: "Products",
           value: data?.products,
           detail: "In your workspace",
           tone: "gray",
+          icon: Box,
         },
-      ].map((stat, index) => (
-        <div className="stat" key={stat.label}>
+      ].map((stat) => (
+        <div className={`stat stat-${stat.tone}`} key={stat.label}>
           <div className="stat-label">
             <span>{stat.label}</span>
             <span className={`stat-indicator ${stat.tone}`}>
-              {["↗", "◈", "◷", "▦"][index]}
+              <stat.icon size={18} />
             </span>
           </div>
           <strong>{stat.value === undefined ? "—" : number(stat.value)}</strong>
@@ -448,8 +474,8 @@ export function LicenseTable({
   onSelect: (license: License) => void;
 }) {
   return (
-    <div className="table-scroll">
-      <table>
+    <div className="table-scroll license-table-wrap">
+      <table className="license-table">
         <thead>
           <tr>
             <th>License</th>
@@ -466,7 +492,7 @@ export function LicenseTable({
         <tbody>
           {items.map((license) => (
             <tr key={license.id}>
-              <td>
+              <td data-label="License">
                 <button
                   className="record-button"
                   onClick={() => onSelect(license)}
@@ -480,30 +506,50 @@ export function LicenseTable({
                   </span>
                 </button>
               </td>
-              <td>
+              <td data-label="Product">
                 <span className="product-tag">{license.productName}</span>
               </td>
-              <td className="secondary">
-                {license.customerName ?? (
+              <td className="secondary" data-label="Customer">
+                {license.customerName ? (
+                  <span className="license-customer">
+                    <span className="customer-initial" aria-hidden="true">
+                      {license.customerName
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join("")}
+                    </span>
+                    {license.customerName}
+                  </span>
+                ) : (
                   <span className="muted">Unassigned</span>
                 )}
               </td>
-              <td>
+              <td data-label="Status">
                 <Badge status={license.status} />
               </td>
-              <td>
-                <span
-                  className={
-                    license.deviceCount >= license.maxDevices
-                      ? "device-full"
-                      : ""
-                  }
-                >
-                  {license.deviceCount}
-                </span>
-                <span className="muted"> / {license.maxDevices}</span>
+              <td data-label="Devices">
+                <div className="seat-count">
+                  <span>
+                    <span
+                      className={
+                        license.deviceCount >= license.maxDevices
+                          ? "device-full"
+                          : ""
+                      }
+                    >
+                      {license.deviceCount}
+                    </span>
+                    <span className="muted"> / {license.maxDevices}</span>
+                  </span>
+                  <progress
+                    value={license.deviceCount}
+                    max={license.maxDevices}
+                    aria-label={`${license.deviceCount} of ${license.maxDevices} device seats used`}
+                  />
+                </div>
               </td>
-              <td className="secondary nowrap">
+              <td className="secondary nowrap" data-label="Expires">
                 {!license.activatedAt && license.durationDays
                   ? `${license.durationDays} days on activation`
                   : date(license.expiresAt)}
@@ -514,6 +560,9 @@ export function LicenseTable({
                   aria-label={`View ${license.label}`}
                   onClick={() => onSelect(license)}
                 >
+                  <span className="mobile-detail-label">
+                    View license details
+                  </span>
                   <ChevronRight size={17} />
                 </button>
               </td>

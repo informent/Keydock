@@ -1,7 +1,27 @@
 # Console design
 
-The console uses an original, responsive interface with a persistent workspace navigation, compact tables, explicit empty states, keyboard-accessible dialogs, one-time secret delivery, and the same workflows on mobile.
+The console uses an original forest-green and warm-neutral visual system. A dark navigation rail keeps the workspace stable while clear headings, restrained borders, generous spacing, and semantic colors organize the records. Light and dark themes cover every page, form, dialog, status, and empty state. Typography uses locally served Inter, with Lucide icons for consistent navigation and actions.
 
-The 12ui workflow was attempted during development, but its account connection was unavailable. No generated 12ui design or external screenshot was used as an implementation target. The shipped UI is original React/CSS, with Lucide icons under the ISC license and locally served Inter fonts under the SIL Open Font License. The application does not request fonts or assets from third-party CDNs.
+The license table becomes a labeled card list on small screens, keeping customer, product, status, device capacity, expiry, and detail actions available without horizontal scrolling. Other wide data tables scroll within their panels. The overview chart uses real request aggregates; empty history stays empty rather than displaying sample trends.
 
-`scripts/ui-smoke.mjs` exercises the UI headlessly against a real temporary instance. It captures the README images using illustrative records. Those screenshots contain masked keys and no reusable instance secrets.
+License creation pairs the form with a live issuance summary. It separates the key count from each key's device limit, explains the total capacity, and shows validity, the assigned customer, entitlements, and offline lease duration. The summary sits beside the form on desktop and follows the fields on phones. The generate/cancel controls stay available while scrolling. Customer filtering preserves an existing assignment. The dialog blocks dismissal while generation is pending so its one-time keys cannot be lost by closing it during the request.
+
+## Navigation and accessibility
+
+- Ctrl+K or Command+K opens workspace search. Results include pages, role-appropriate actions, and matching licenses from the instance API. Debounced requests are cancelled when the search changes; previous-query results cannot be selected while a new request is loading.
+- Search supports arrow keys and Enter. Native modal dialogs trap focus, support Escape, and restore focus when they close. Global search stays out of the way while another dialog is open, including one-time secret delivery.
+- Mobile navigation locks background scrolling, makes the main content inert, traps keyboard focus, and returns focus on close. The skip link focuses the current page without changing its route.
+- Theme selection begins with the browser preference and saves an explicit choice locally. It synchronizes between tabs without sending a preference to the server.
+- Reduced-motion preferences disable transitions and animations. The browser checks enforce at least 4.5:1 contrast for the primary, secondary, muted, accent, and status text color pairs in both themes. Chart counts are available through keyboard exploration and a live readout.
+
+## Preview and verification
+
+[Overview](images/overview.png) · [Licenses](images/licenses.png) · [Dark theme](images/dark.png) · [Mobile licenses](images/mobile.png) · [Mobile overview](images/mobile-dark.png) · [Workspace search](images/command-search.png) · [License details](images/license-detail.png) · [Issue a batch](images/issue-license.png) · [Sign in](images/sign-in.png)
+
+`npm run test:ui` runs two headless browser checks against real temporary instances. `scripts/ui-smoke.mjs` covers setup, product/customer creation, license issuance, one-time secrets, device release, API tokens, audit verification, and sign-out. `scripts/ui-experience-smoke.mjs` covers the populated workspace, search, slower responses, chart interaction, themes, viewer permissions, keyboard focus, and all seven pages at 320, 390, 768, 1024, and 1440 pixels. Desktop and phone layouts are checked in both themes, with no horizontal page overflow or browser/CSP errors allowed.
+
+The checks capture the screenshots using disposable, illustrative records. Images contain masked keys and no reusable instance secrets. The demo database, identity, and random credentials are removed after the run.
+
+## Asset provenance
+
+The 12ui workflow was attempted during development, but its account connection was unavailable. No generated 12ui design or external screenshot was used as an implementation target. The shipped UI is original React/CSS, with Lucide icons under the ISC license and Inter fonts under the SIL Open Font License. The application does not request fonts or assets from third-party CDNs.

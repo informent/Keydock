@@ -5,7 +5,6 @@ import {
   Box,
   Check,
   CheckCircle2,
-  Clock3,
   Code2,
   Download,
   KeyRound,
@@ -43,14 +42,18 @@ import type {
   User,
 } from "./types";
 
+import { RequestActivity } from "./RequestActivity";
+
 const value = (data: FormData, key: string) => String(data.get(key) ?? "");
 export function OverviewPage({
+  userName,
   revision,
   onIssue,
   onProduct,
   onSelect,
   canWrite,
 }: {
+  userName: string;
   revision: number;
   onIssue: () => void;
   onProduct: () => void;
@@ -59,25 +62,7 @@ export function OverviewPage({
 }) {
   const overview = useLoad<Overview>("/admin/overview", revision),
     recent = useLoad<Page<License>>("/admin/licenses?limit=5", revision);
-  const data = overview.data,
-    days = Array.from({ length: 14 }, (_, i) =>
-      new Date((data?.now ?? Date.now()) - (13 - i) * 86400000)
-        .toISOString()
-        .slice(0, 10),
-    );
-  const counts = days.map((day) => ({
-    day,
-    valid:
-      data?.activity
-        .filter((a) => a.day === day && a.outcome === "valid")
-        .reduce((n, a) => n + a.count, 0) ?? 0,
-    denied:
-      data?.activity
-        .filter((a) => a.day === day && a.outcome === "denied")
-        .reduce((n, a) => n + a.count, 0) ?? 0,
-  }));
-  const max = Math.max(1, ...counts.map((c) => c.valid + c.denied)),
-    total = counts.reduce((n, c) => n + c.valid + c.denied, 0);
+  const data = overview.data;
   const steps = [
     {
       title: "Create your first product",
@@ -105,7 +90,7 @@ export function OverviewPage({
       <PageTitle
         eyebrow="YOUR LICENSING WORKSPACE"
         title="Overview"
-        text="A clear view of your products and the people using them."
+        text={`Welcome back, ${userName.split(/\s+/)[0]}. Here is what is happening with your software.`}
         actions={
           canWrite ? (
             <button className="button primary" onClick={onIssue}>
@@ -118,72 +103,7 @@ export function OverviewPage({
       <ErrorBox error={overview.error} />
       <Stats data={data} />
       <div className="overview-grid">
-        <section className="panel activity-chart">
-          <div className="section-heading">
-            <div>
-              <h2>License requests</h2>
-              <p>Activation and validation · last 14 days</p>
-            </div>
-            <span className="period-label">
-              <Clock3 size={14} />
-              14 days
-            </span>
-          </div>
-          <div className="chart-total">
-            <strong>{number(total)}</strong>
-            <span>requests</span>
-          </div>
-          <div
-            className="chart"
-            role="img"
-            aria-label={`${total} licensing requests in the last fourteen days`}
-          >
-            <svg viewBox="0 0 700 170" preserveAspectRatio="none">
-              <line x1="0" y1="155" x2="700" y2="155" className="chart-line" />
-              <line x1="0" y1="85" x2="700" y2="85" className="chart-line" />
-              <line x1="0" y1="15" x2="700" y2="15" className="chart-line" />
-              {counts.map((count, index) => {
-                const valid = (130 * count.valid) / max,
-                  denied = (130 * count.denied) / max;
-                return (
-                  <g key={count.day}>
-                    <title>
-                      {count.day}: {count.valid} valid, {count.denied} denied
-                    </title>
-                    <rect
-                      x={index * 50 + 12}
-                      y={155 - Math.max(valid, 2)}
-                      width="26"
-                      height={Math.max(valid, 2)}
-                      rx="3"
-                      className={count.valid ? "chart-valid" : "chart-empty"}
-                    />
-                    {count.denied > 0 && (
-                      <rect
-                        x={index * 50 + 12}
-                        y={155 - valid - denied}
-                        width="26"
-                        height={denied}
-                        rx="3"
-                        className="chart-denied"
-                      />
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-          <div className="chart-labels">
-            <span>{days[0].slice(5)}</span>
-            <div>
-              <span className="legend valid" />
-              Valid
-              <span className="legend denied" />
-              Denied
-            </div>
-            <span>{days[13].slice(5)}</span>
-          </div>
-        </section>
+        <RequestActivity data={data} />
         <section className="panel setup-card">
           <div className="section-heading">
             <div>
