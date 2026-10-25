@@ -3,14 +3,18 @@
 For Node.js 22+ and Electron main processes. No runtime dependencies. Install from the repository with `npm install ./sdk/javascript`, or copy this directory into your project. It is not yet published to npm.
 
 ```js
-import { KeydockClient } from '@keydock/client';
+import { KeydockClient } from "@keydock/client";
 const licensing = new KeydockClient({
-  baseUrl: 'https://licenses.example.com',
-  productId: 'YOUR-PRODUCT-UUID',
+  baseUrl: "https://licenses.example.com",
+  productId: "YOUR-PRODUCT-UUID",
   publicKey: YOUR_PINNED_ED25519_PUBLIC_KEY_PEM,
 });
-const result = await licensing.activate({ key: userEnteredKey, fingerprint: savedInstallationId, name: 'My PC' });
-if (result.entitlements.includes('export')) enableExport();
+const result = await licensing.activate({
+  key: userEnteredKey,
+  fingerprint: savedInstallationId,
+  name: "My PC",
+});
+if (result.entitlements.includes("export")) enableExport();
 // Explicit offline verification of a previously saved lease:
 const claims = licensing.verify(result.lease, savedInstallationId);
 ```

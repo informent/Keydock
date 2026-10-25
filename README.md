@@ -2,10 +2,15 @@
 
 **Licensing infrastructure you own.** An MIT-licensed, self-hosted key system for software developers and tool owners.
 
-The licensing API and JavaScript/Python clients are complete. The admin console and deployment bundle are being built in subsequent commits. This is an early release; it has not undergone an independent security audit.
+Keydock includes a responsive admin console, licensing API, and JavaScript/Python clients. This is an early release; it has not undergone an independent security audit.
+
+![Keydock license workspace](docs/images/licenses.png)
+
+_The console connected to a real local instance with illustrative customer and license records._
 
 ## Available now
 
+- A responsive console with guided owner setup, overview, licenses, products, customers, activity, developer integration and team settings.
 - Products, customers and batch license issuance (up to 100 keys per request).
 - 192-bit random license keys, HMAC-hashed storage, rotation, suspension, permanent revocation and renewal.
 - Device limits enforced inside SQLite write transactions; idempotent activation and device release.
@@ -15,41 +20,48 @@ The licensing API and JavaScript/Python clients are complete. The admin console 
 - Password hashing with scrypt, persistent login throttling, server-side sessions, CSRF protection and strict security headers.
 - Search, pagination, safe CSV export, validation aggregates and a chained HMAC audit log.
 - Optional idempotency keys for batch issuance, with encrypted response replay for 24 hours.
+- Online SQLite backups with identity preservation, checksum/integrity verification, and restore into a new directory.
+- An isolated local demo with sample products, customers, licenses and devices.
 - [JavaScript/TypeScript client](sdk/javascript/README.md) and [Python client](sdk/python/README.md) that verify signatures, application/device binding and expiry before granting entitlements.
 
-## Run the API
+## Run Keydock
 
 Requires Node.js 24.12 or newer within Node 24.
 
 ```sh
 npm ci
+npm run build
 npm start
 ```
 
-The default address is `http://127.0.0.1:3400`. First startup creates `data/identity.json` and `data/keydock.sqlite`. Keep both private. The `setupToken` in the identity file authorizes the one-time owner setup endpoint. It is never printed in application logs.
+Open `http://127.0.0.1:3400`. First startup creates `data/identity.json` and `data/keydock.sqlite`. Keep both private. Copy `setupToken` from the identity file into the one-time setup screen, then create your owner account. The token is never printed in application logs. Create a product, issue a key, and use the Developers page to connect your application.
 
 `KEYDOCK_ORIGIN` sets the exact browser origin and lease issuer. Remote deployments require HTTPS. `HOST`, `PORT` and `KEYDOCK_DATA_DIR` configure the listener and storage. Bind the listener behind a trusted TLS reverse proxy; proxy headers are deliberately not trusted by the application.
+
+To explore a populated workspace, run `npm run demo` after building. It listens at `http://127.0.0.1:3401`, creates a random owner password, and prints the path to a private credentials file. Production environment settings are ignored. Ctrl+C closes the demo and removes its temporary data. Use `npm run demo -- --port 3402` to choose another local port.
+
+Create a backup with `npm run backup`, check it with `npm run backup:verify -- BACKUP_DIRECTORY`, and restore it with `npm run restore -- BACKUP_DIRECTORY --to NEW_DATA_DIRECTORY`. The restore destination must not exist and its parent must already exist. Backups contain private identity material; see [storage and recovery](docs/operations.md#storage-and-recovery) for configuration and recovery steps.
 
 ## API
 
 All routes use `/api/v1`. POST and PATCH bodies are JSON. Errors use `{ "error": { "code", "message", "requestId" } }`. Admin cookie requests require an exact `Origin` header and the `X-Keydock-CSRF` value from the session response. Integrations use `Authorization: Bearer kd_api_…`.
 
-| Route | Purpose |
-| --- | --- |
-| `POST /auth/setup` | One-time owner setup with name, email, password (14+ characters), setupToken |
-| `POST /auth/login` | Start a 12-hour session |
-| `GET /auth/session` | Current user and CSRF token |
-| `POST /admin/products` | Create a product with name and slug |
-| `POST /admin/customers` | Create a customer with name and email |
-| `POST /admin/licenses` | Issue keys with productId, label, maxDevices, optional customerId, expiresAt or durationDays, entitlements, count |
-| `GET /admin/licenses` | Search, filter and paginate licenses |
-| `POST /admin/licenses/:id/status` | Suspend, resume or permanently revoke |
-| `POST /admin/licenses/:id/renew` | Extend expiry by days |
-| `POST /admin/licenses/:id/rotate` | Replace the key; show the replacement once |
-| `POST /client/activate` | Activate using productId, key, fingerprint, name |
-| `POST /client/validate` | Refresh a lease for an existing activation |
-| `POST /client/deactivate` | Release the caller's device |
-| `GET /admin/audit/verify` | Verify the retained audit chain |
+| Route                             | Purpose                                                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/setup`                | One-time owner setup with name, email, password (14+ characters), setupToken                                      |
+| `POST /auth/login`                | Start a 12-hour session                                                                                           |
+| `GET /auth/session`               | Current user and CSRF token                                                                                       |
+| `POST /admin/products`            | Create a product with name and slug                                                                               |
+| `POST /admin/customers`           | Create a customer with name and email                                                                             |
+| `POST /admin/licenses`            | Issue keys with productId, label, maxDevices, optional customerId, expiresAt or durationDays, entitlements, count |
+| `GET /admin/licenses`             | Search, filter and paginate licenses                                                                              |
+| `POST /admin/licenses/:id/status` | Suspend, resume or permanently revoke                                                                             |
+| `POST /admin/licenses/:id/renew`  | Extend expiry by days                                                                                             |
+| `POST /admin/licenses/:id/rotate` | Replace the key; show the replacement once                                                                        |
+| `POST /client/activate`           | Activate using productId, key, fingerprint, name                                                                  |
+| `POST /client/validate`           | Refresh a lease for an existing activation                                                                        |
+| `POST /client/deactivate`         | Release the caller's device                                                                                       |
+| `GET /admin/audit/verify`         | Verify the retained audit chain                                                                                   |
 
 Admin creation returns raw license keys once. List endpoints never return them. An `Idempotency-Key` of 16–128 letters, digits, underscores or hyphens replays the same issuance response for 24 hours. Reusing it with a different request returns 409. Retries outside that period can create new licenses.
 
@@ -61,9 +73,12 @@ The audit chain detects changes to retained records using the instance secret. D
 
 ```sh
 npm test
+npm run typecheck
+npm run build
+node scripts/ui-smoke.mjs
 ```
 
-API tests cover concurrent device allocation, lifecycle transitions, signed lease tampering, expiry, CSRF, role and product boundaries, key rotation, encrypted idempotency replay and session invalidation.
+Tests cover concurrent device allocation, lifecycle transitions, signed lease tampering, expiry, CSRF, role and product boundaries, key rotation, encrypted idempotency replay, session invalidation, live backup recovery, damaged backup rejection, and demo isolation. The browser check runs headlessly, exercises the complete setup-to-device-release workflow, and checks mobile layout and browser errors. Install Chromium with `npx playwright install chromium` on Linux; Windows uses Edge when available. See [operations](docs/operations.md) for deployment details.
 
 ## References and attribution
 
