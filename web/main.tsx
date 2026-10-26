@@ -4,6 +4,7 @@ import App from "./App";
 import { ThemeProvider, readTheme } from "./theme";
 import "./styles.css";
 import "./customer-workspace.css";
+import "./desktop.css";
 
 document.documentElement.dataset.theme = readTheme();
 

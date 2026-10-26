@@ -30,3 +30,9 @@ jobs:
       - run: node scripts/ui-smoke.mjs
       - run: node scripts/ui-experience-smoke.mjs
       - run: node scripts/ui-customers-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: console-screenshots
+          path: docs/images/
+          retention-days: 7

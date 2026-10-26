@@ -14,6 +14,7 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  Rows3,
   Settings,
   Search,
   ShieldCheck,
@@ -344,6 +345,13 @@ function Console({
   const readRoute = () =>
     location.hash.replace(/^#\/?/, "").split("?")[0] || "overview";
   const [route, setRoute] = useState(readRoute),
+    [compact, setCompact] = useState(() => {
+      try {
+        return localStorage.getItem("keydock:compact-tables") !== "false";
+      } catch {
+        return true;
+      }
+    }),
     [mobile, setMobile] = useState(false),
     [command, setCommand] = useState(false),
     [revision, setRevision] = useState(0),
@@ -362,6 +370,13 @@ function Console({
     } | null>(null),
     [signingOut, setSigningOut] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    try {
+      localStorage.setItem("keydock:compact-tables", String(compact));
+    } catch {
+      // The current session still supports density changes without storage.
+    }
+  }, [compact]);
   const customerId = route.match(/^customers\/([^/]+)$/)?.[1] ?? null,
     pageRoute = customerId ? "customers" : route;
   const products = useLoad<{ items: Product[] }>("/admin/products", revision),
@@ -554,7 +569,10 @@ function Console({
       );
   }
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-density={compact ? "compact" : "comfortable"}
+    >
       <a
         className="skip-link"
         href="#main-content"
@@ -590,7 +608,7 @@ function Console({
         <div className="workspace-switch">
           <span className="workspace-icon">K</span>
           <div>
-            <strong>Your workspace</strong>
+            <strong>Licensing console</strong>
             <span>Self-hosted instance</span>
           </div>
           <span className="workspace-dot" />
@@ -614,11 +632,7 @@ function Console({
         <div className="sidebar-bottom">
           <div className="instance-card">
             <ShieldCheck size={19} />
-            <strong>
-              Your infrastructure.
-              <br />
-              Your rules.
-            </strong>
+            <strong>Instance settings</strong>
             <a href="#/settings" onClick={() => setMobile(false)}>
               Manage instance <ArrowRight size={14} />
             </a>
@@ -688,6 +702,19 @@ function Console({
               <kbd>
                 {/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ K" : "Ctrl K"}
               </kbd>
+            </button>
+            <button
+              className="density-toggle icon-button"
+              aria-label="Compact tables"
+              aria-pressed={compact}
+              title={
+                compact
+                  ? "Switch to comfortable tables"
+                  : "Switch to compact tables"
+              }
+              onClick={() => setCompact((value) => !value)}
+            >
+              <Rows3 size={17} />
             </button>
             <ThemeToggle />
             <span className="self-hosted">

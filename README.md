@@ -63,7 +63,7 @@ Create a backup with `npm run backup`, check it with `npm run backup:verify -- B
 
 Press **Ctrl+K** (Windows/Linux) or **⌘K** (Mac) to jump to a page, find a license, open a customer by name/email/reference, or start an action allowed by your role. Use the arrow keys and Enter to select a result; Escape closes the dialog and returns focus. Record search begins after two characters.
 
-The theme button switches between light and dark appearances. Your first visit follows the browser's preferred color scheme; your choice is then saved in that browser and shared across tabs. On phones, licenses become readable cards with the same details and actions as the desktop table.
+The theme button switches between light and dark appearances. Your first visit follows the browser's preferred color scheme; your choice is then saved in that browser and shared across tabs. On desktop, the **Compact tables** button beside the theme control switches between compact and comfortable rows. The choice is saved in that browser. The console keeps four overview metrics side by side on desktop and uses wider customer workspaces for license records and account details. On phones, licenses become readable cards with the same details and actions as the desktop table.
 
 The overview shows actual activation and validation counts over seven or fourteen days. Hover over the chart, or focus it and use the arrow keys, to inspect daily totals. The license workspace includes product/status filters, customer search, and a single **Clear filters** action.
 

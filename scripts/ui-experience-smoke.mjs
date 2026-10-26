@@ -138,6 +138,45 @@ try {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("heading", { name: "Overview", exact: true }).waitFor();
   await settled();
+  const density = page.getByRole("button", {
+    name: "Compact tables",
+    exact: true,
+  });
+  await expect(density).toHaveAttribute("aria-pressed", "true");
+  const firstRow = page.locator(".license-table tbody tr").first();
+  const compactHeight = await firstRow.evaluate(
+    (row) => row.getBoundingClientRect().height,
+  );
+  await density.click();
+  assert.ok(
+    (await firstRow.evaluate((row) => row.getBoundingClientRect().height)) >
+      compactHeight,
+    "Comfortable tables should provide more vertical space",
+  );
+  await page.reload();
+  await settled();
+  await expect(density).toHaveAttribute("aria-pressed", "false");
+  await density.click();
+  for (const width of [1024, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await noOverflow(`desktop overview at ${width}`);
+    assert.equal(
+      await page
+        .locator(".stat")
+        .evaluateAll(
+          (items) =>
+            new Set(
+              items.map((item) => Math.round(item.getBoundingClientRect().top)),
+            ).size,
+        ),
+      1,
+      "Desktop overview metrics should stay in one row",
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  console.log(
+    "PASS: desktop density, preference persistence, laptop and wide-screen layout",
+  );
   await screenshot("overview.png");
   await page
     .getByRole("combobox", { name: "Request period", exact: true })
