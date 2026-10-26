@@ -14,7 +14,7 @@
     "test": "node --test --test-isolation=none --test-concurrency=1 tests/*.test.mjs",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test:ui": "node scripts/ui-smoke.mjs && node scripts/ui-experience-smoke.mjs",
+    "test:ui": "node scripts/ui-smoke.mjs && node scripts/ui-experience-smoke.mjs && node scripts/ui-customers-smoke.mjs",
     "verify": "npm run typecheck && npm test && npm run build",
     "backup": "node scripts/backup.mjs create",
     "backup:verify": "node scripts/backup.mjs verify",

@@ -284,10 +284,12 @@ export async function createApp({
     globalScope(req.actor);
     const query = listQuery(req),
       search = `%${query.search.replace(/[\\%_]/g, (value) => `\\${value}`)}%`;
-    const filter = " WHERE name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'";
+    const filter =
+      " WHERE name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\' OR external_id LIKE ? ESCAPE '\\'";
     const items = store
       .all(
         `SELECT c.*,(SELECT COUNT(*) FROM licenses l WHERE l.customer_id=c.id) licenses FROM customers c${filter} ORDER BY created_at DESC,id LIMIT ? OFFSET ?`,
+        search,
         search,
         search,
         query.limit,
@@ -297,11 +299,48 @@ export async function createApp({
     return {
       items,
       total: Number(
-        store.get(`SELECT COUNT(*) n FROM customers${filter}`, search, search)
-          .n,
+        store.get(
+          `SELECT COUNT(*) n FROM customers${filter}`,
+          search,
+          search,
+          search,
+        ).n,
       ),
       page: query.page,
       limit: query.limit,
+    };
+  });
+  app.get("/api/v1/admin/customers/:id", read, async (req) => {
+    globalScope(req.actor);
+    const customerId = id(req),
+      customer = store.get("SELECT * FROM customers WHERE id=?", customerId);
+    if (!customer) fail(404, "NOT_FOUND", "Customer not found");
+    const now = store.clock();
+    const counts = store.get(
+      `SELECT COUNT(*) licenses, COUNT(DISTINCT product_id) products,
+        COALESCE(SUM(status='active' AND (expires_at IS NULL OR expires_at>?)),0) active,
+        COALESCE(SUM(status='active' AND expires_at<=?),0) expired,
+        COALESCE(SUM(status='active' AND expires_at>? AND expires_at<=?),0) expiring,
+        COALESCE(SUM(status='suspended'),0) suspended,
+        COALESCE(SUM(status='revoked'),0) revoked,
+        MAX(created_at) latestLicenseAt
+       FROM licenses WHERE customer_id=?`,
+      now,
+      now,
+      now,
+      now + 7 * 86400000,
+      customerId,
+    );
+    const devices = store.get(
+      `SELECT COALESCE(SUM(a.released_at IS NULL),0) devices, MAX(a.last_seen_at) lastSeenAt
+       FROM activations a JOIN licenses l ON l.id=a.license_id WHERE l.customer_id=?`,
+      customerId,
+    );
+    const { licenses, ...summary } = counts;
+    return {
+      ...customerView({ ...customer, licenses }),
+      summary: { ...summary, ...devices },
+      now,
     };
   });
   app.post("/api/v1/admin/customers", write, async (req, reply) => {

@@ -12,7 +12,16 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { api, date, dateTime, download, message, number, useLoad } from "./api";
+import {
+  api,
+  date,
+  dateTime,
+  download,
+  message,
+  number,
+  useDebouncedValue,
+  useLoad,
+} from "./api";
 import {
   Badge,
   Confirm,
@@ -401,7 +410,7 @@ export function CustomersPage({
   const [search, setSearch] = useState(""),
     [page, setPage] = useState(1),
     result = useLoad<Page<Customer>>(
-      `/admin/customers?search=${encodeURIComponent(search)}&page=${page}`,
+      `/admin/customers?search=${encodeURIComponent(useDebouncedValue(search))}&page=${page}`,
       revision,
     );
   return (
@@ -409,7 +418,7 @@ export function CustomersPage({
       <PageTitle
         eyebrow="RELATIONSHIPS"
         title="Customers"
-        text="Connect the right licenses to the right people."
+        text="Customer records, licenses, and support context."
         actions={
           canWrite ? (
             <button className="button primary" onClick={onCreate}>
@@ -427,23 +436,25 @@ export function CustomersPage({
               setSearch(value);
               setPage(1);
             }}
-            placeholder="Search names or email addresses…"
+            placeholder="Search names, emails, or references…"
           />
           <span className="secondary">
             {number(result.data?.total ?? 0)} customers
           </span>
         </div>
         <ErrorBox error={result.error} />
-        {result.loading ? (
+        {result.loading && !result.data ? (
           <Loading />
         ) : result.data?.items.length ? (
-          <div className="table-scroll">
-            <table>
+          <div
+            className="table-scroll customer-table-wrap"
+            aria-busy={result.loading}
+          >
+            <table className="customer-table">
               <thead>
                 <tr>
                   <th>Customer</th>
-                  <th>Email</th>
-                  <th>External ID</th>
+                  <th>Reference</th>
                   <th>Licenses</th>
                   <th>Added</th>
                   <th />
@@ -452,24 +463,47 @@ export function CustomersPage({
               <tbody>
                 {result.data.items.map((c) => (
                   <tr key={c.id}>
-                    <td>
-                      <div className="customer-name">
+                    <td data-label="Customer">
+                      <a
+                        className="customer-name"
+                        href={`#/customers/${c.id}`}
+                        aria-label={`View ${c.name}`}
+                      >
                         <span className="avatar">
-                          {c.name.slice(0, 2).toUpperCase()}
+                          {c.name
+                            .trim()
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((part) => part[0])
+                            .join("")
+                            .toUpperCase()}
                         </span>
-                        <strong>{c.name}</strong>
-                      </div>
+                        <span>
+                          <strong>{c.name}</strong>
+                          <small>{c.email}</small>
+                        </span>
+                      </a>
                     </td>
-                    <td className="secondary">{c.email}</td>
-                    <td>
+                    <td data-label="Reference">
                       <code>{c.externalId ?? "—"}</code>
                     </td>
-                    <td>{number(c.licenses)}</td>
-                    <td className="secondary">{date(c.createdAt)}</td>
-                    <td>
-                      <button className="text-link" onClick={() => onEdit(c)}>
-                        {canWrite ? "Edit" : "View"}
-                      </button>
+                    <td data-label="Licenses">{number(c.licenses)}</td>
+                    <td className="secondary" data-label="Added">
+                      {date(c.createdAt)}
+                    </td>
+                    <td className="customer-row-actions">
+                      {canWrite && (
+                        <button className="text-link" onClick={() => onEdit(c)}>
+                          Edit
+                        </button>
+                      )}
+                      <a
+                        className="text-link"
+                        href={`#/customers/${c.id}`}
+                        aria-label={`Open ${c.name} profile`}
+                      >
+                        Open <ArrowUpRight size={13} />
+                      </a>
                     </td>
                   </tr>
                 ))}
