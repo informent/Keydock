@@ -74,10 +74,14 @@ export function OverviewPage({
   const data = overview.data;
   const steps = [
     {
-      title: "Create your first product",
-      text: "Define the application you want to license.",
+      title: data?.products ? "Manage products" : "Create your first product",
+      text: "Configure applications and their license settings.",
       complete: !!data?.products,
-      action: onProduct,
+      action: data?.products
+        ? () => {
+            location.hash = "/products";
+          }
+        : onProduct,
     },
     {
       title: "Issue a license key",
@@ -86,8 +90,8 @@ export function OverviewPage({
       action: onIssue,
     },
     {
-      title: "Connect your application",
-      text: "Activate a device using a client SDK.",
+      title: "Integration guide",
+      text: "API tokens, client SDKs, and activation examples.",
       complete: !!data?.devices,
       action: () => {
         location.hash = "/developers";
@@ -99,7 +103,7 @@ export function OverviewPage({
       <PageTitle
         eyebrow="YOUR LICENSING WORKSPACE"
         title="Overview"
-        text={`Welcome back, ${userName.split(/\s+/)[0]}. Here is what is happening with your software.`}
+        text={`Welcome back, ${userName.split(/\s+/)[0]}. Review licenses, devices, and recent requests.`}
         actions={
           canWrite ? (
             <button className="button primary" onClick={onIssue}>
@@ -118,10 +122,10 @@ export function OverviewPage({
             <div>
               <h2>
                 {steps.every((s) => s.complete)
-                  ? "You’re connected"
-                  : "Make it yours"}
+                  ? "Workspace shortcuts"
+                  : "Get started"}
               </h2>
-              <p>From application to activation.</p>
+              <p>Products, keys, and application access.</p>
             </div>
             <Box size={21} />
           </div>
@@ -130,7 +134,9 @@ export function OverviewPage({
               key={step.title}
               className="setup-step"
               onClick={step.action}
-              disabled={!canWrite && index < 2}
+              disabled={
+                !canWrite && (index === 1 || (index === 0 && !data?.products))
+              }
             >
               <span
                 className={`step-number ${step.complete ? "complete" : ""}`}
@@ -146,7 +152,7 @@ export function OverviewPage({
           ))}
           <div className="setup-footer">
             <ShieldCheck size={16} />
-            Your server. Your keys. Your rules.
+            Licenses are managed on your instance.
           </div>
         </section>
       </div>
@@ -168,7 +174,7 @@ export function OverviewPage({
           <LicenseTable items={recent.data.items} onSelect={onSelect} />
         ) : (
           <Empty
-            title="Ready when you are"
+            title="No licenses issued"
             text="Your licenses will appear here as you issue them."
           />
         )}
@@ -193,7 +199,7 @@ export function ProductsPage({
       <PageTitle
         eyebrow="CATALOG"
         title="Products"
-        text="A dedicated home for each tool you build."
+        text="Manage the applications you license."
         actions={
           canWrite ? (
             <button className="button primary" onClick={onCreate}>
@@ -783,7 +789,7 @@ export function DevelopersPage({
       <PageTitle
         eyebrow="BUILD WITH KEYDOCK"
         title="Developers"
-        text="A small integration. A licensing system you control."
+        text="Connect your applications to the licensing API."
         actions={
           <a
             className="button"
