@@ -38,9 +38,7 @@ export function Brand({ small = false }: { small?: boolean }) {
       <span className="brand-mark">
         <KeyRound size={small ? 20 : 23} />
       </span>
-      <span>
-        Keydock<span className="brand-dot">.</span>
-      </span>
+      <span className="brand-name">Keydock</span>
     </a>
   );
 }
@@ -426,7 +424,9 @@ export function Stats({ data }: { data: Overview | null }) {
         {
           label: "Active licenses",
           value: data?.active,
-          detail: "Ready to validate",
+          detail: data
+            ? `of ${number(data.licenses)} total licenses`
+            : "Ready to validate",
           tone: "green",
           icon: KeyRound,
         },
@@ -459,7 +459,16 @@ export function Stats({ data }: { data: Overview | null }) {
               <stat.icon size={18} />
             </span>
           </div>
-          <strong>{stat.value === undefined ? "—" : number(stat.value)}</strong>
+          <strong>
+            {stat.value === undefined ? "—" : number(stat.value)}
+            <span className="stat-unit">
+              {stat.label === "Activated devices"
+                ? "devices"
+                : stat.label === "Products"
+                  ? "products"
+                  : "licenses"}
+            </span>
+          </strong>
           <span className="stat-detail">{stat.detail}</span>
         </div>
       ))}

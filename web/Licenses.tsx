@@ -777,6 +777,7 @@ export function LicenseDetail({
         title={license?.label ?? "License details"}
         description={license?.productName}
         onClose={onClose}
+        className="license-inspector"
         wide
       >
         {result.loading && !license ? (

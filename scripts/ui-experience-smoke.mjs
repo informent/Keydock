@@ -94,6 +94,7 @@ try {
         ["amber", "amber-soft"],
         ["blue", "blue-soft"],
         ["purple", "purple-soft"],
+        ["positive", "positive-soft"],
       ].map(([text, background]) => ({
         label: `${text} on ${background}`,
         colors: [text, background].map((name) =>
@@ -157,6 +158,45 @@ try {
   await settled();
   await expect(density).toHaveAttribute("aria-pressed", "false");
   await density.click();
+  const expandedWidth = await page
+    .locator(".main-shell")
+    .evaluate((element) => element.getBoundingClientRect().width);
+  await page
+    .getByRole("button", { name: "Collapse sidebar", exact: true })
+    .click();
+  assert.ok(
+    (await page
+      .locator(".main-shell")
+      .evaluate((element) => element.getBoundingClientRect().width)) >
+      expandedWidth,
+    "Collapsing navigation must give the workspace more room",
+  );
+  await screenshot("sidebar-collapsed.png");
+  await page.reload();
+  await settled();
+  await expect(
+    page.getByRole("button", { name: "Expand sidebar", exact: true }),
+  ).toBeVisible();
+  await go("Licenses");
+  await expect(
+    page.getByRole("heading", { name: "Licenses", exact: true }),
+  ).toBeVisible();
+  await go("Overview");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Open navigation", exact: true })
+    .click();
+  await expect(
+    page.locator('.sidebar a[href="#/licenses"] .nav-text'),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page
+    .getByRole("button", { name: "Expand sidebar", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "License health", exact: true }),
+  ).toBeVisible();
   for (const width of [1024, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await noOverflow(`desktop overview at ${width}`);
@@ -178,6 +218,9 @@ try {
     "PASS: desktop density, preference persistence, laptop and wide-screen layout",
   );
   await screenshot("overview.png");
+  await theme("dark");
+  await screenshot("overview-dark.png");
+  await theme("light");
   await page
     .getByRole("combobox", { name: "Request period", exact: true })
     .selectOption("7");
