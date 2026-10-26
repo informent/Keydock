@@ -45,6 +45,20 @@ export interface Device {
   lastSeenAt: number;
   releasedAt: number | null;
 }
+export interface CustomerProfile extends Customer {
+  summary: {
+    active: number;
+    expired: number;
+    expiring: number;
+    suspended: number;
+    revoked: number;
+    products: number;
+    devices: number;
+    latestLicenseAt: number | null;
+    lastSeenAt: number | null;
+  };
+  now: number;
+}
 export interface License {
   id: string;
   productId: string;

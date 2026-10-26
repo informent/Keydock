@@ -283,11 +283,13 @@ export function Licenses({
 
 export function IssueLicense({
   products,
+  initialCustomer,
   onClose,
   onIssued,
   onProduct,
 }: {
   products: Product[];
+  initialCustomer?: Customer | null;
   onClose: () => void;
   onIssued: (items: License[]) => void;
   onProduct: () => void;
@@ -295,7 +297,9 @@ export function IssueLicense({
   const [mode, setMode] = useState("lifetime"),
     [issuing, setIssuing] = useState(false),
     [customerSearch, setCustomerSearch] = useState(""),
-    [assignedCustomer, setAssignedCustomer] = useState<Customer | null>(null),
+    [assignedCustomer, setAssignedCustomer] = useState<Customer | null>(
+      initialCustomer ?? null,
+    ),
     [draft, setDraft] = useState({
       productId: products.find((product) => product.active)?.id ?? "",
       label: "",

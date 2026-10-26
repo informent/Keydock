@@ -29,3 +29,4 @@ jobs:
         if: runner.os == 'Linux'
       - run: node scripts/ui-smoke.mjs
       - run: node scripts/ui-experience-smoke.mjs
+      - run: node scripts/ui-customers-smoke.mjs

@@ -3036,30 +3036,30 @@ th:last-child {
     padding-right: 82px;
   }
   .license-table td:first-child::before,
-  .license-table td:nth-child(4)::before,
+  .license-table td[data-label="Status"]::before,
   .license-table td:last-child::before {
     display: none;
   }
-  .license-table td:nth-child(4) {
+  .license-table td[data-label="Status"] {
     grid-column: 2;
     grid-row: 1;
     justify-self: end;
     align-self: start;
     padding-top: 5px;
   }
-  .license-table td:nth-child(2) {
+  .license-table td[data-label="Product"] {
     grid-column: 1;
     grid-row: 2;
   }
-  .license-table td:nth-child(3) {
+  .license-table td[data-label="Customer"] {
     grid-column: 2;
     grid-row: 2;
   }
-  .license-table td:nth-child(5) {
+  .license-table td[data-label="Devices"] {
     grid-column: 1;
     grid-row: 3;
   }
-  .license-table td:nth-child(6) {
+  .license-table td[data-label="Expires"] {
     grid-column: 2;
     grid-row: 3;
     white-space: normal;

@@ -469,18 +469,22 @@ export function Stats({ data }: { data: Overview | null }) {
 export function LicenseTable({
   items,
   onSelect,
+  hideCustomer = false,
 }: {
   items: License[];
   onSelect: (license: License) => void;
+  hideCustomer?: boolean;
 }) {
   return (
     <div className="table-scroll license-table-wrap">
-      <table className="license-table">
+      <table
+        className={`license-table ${hideCustomer ? "without-customer" : ""}`}
+      >
         <thead>
           <tr>
             <th>License</th>
             <th>Product</th>
-            <th>Customer</th>
+            {!hideCustomer && <th>Customer</th>}
             <th>Status</th>
             <th>Devices</th>
             <th>Expires</th>
@@ -509,22 +513,24 @@ export function LicenseTable({
               <td data-label="Product">
                 <span className="product-tag">{license.productName}</span>
               </td>
-              <td className="secondary" data-label="Customer">
-                {license.customerName ? (
-                  <span className="license-customer">
-                    <span className="customer-initial" aria-hidden="true">
-                      {license.customerName
-                        .split(/\s+/)
-                        .slice(0, 2)
-                        .map((part) => part[0])
-                        .join("")}
+              {!hideCustomer && (
+                <td className="secondary" data-label="Customer">
+                  {license.customerName ? (
+                    <span className="license-customer">
+                      <span className="customer-initial" aria-hidden="true">
+                        {license.customerName
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((part) => part[0])
+                          .join("")}
+                      </span>
+                      {license.customerName}
                     </span>
-                    {license.customerName}
-                  </span>
-                ) : (
-                  <span className="muted">Unassigned</span>
-                )}
-              </td>
+                  ) : (
+                    <span className="muted">Unassigned</span>
+                  )}
+                </td>
+              )}
               <td data-label="Status">
                 <Badge status={license.status} />
               </td>

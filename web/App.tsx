@@ -23,6 +23,7 @@ import {
 import { api, message, setCsrf, useLoad } from "./api";
 import { Brand, ErrorBox, Field, Loading } from "./components";
 import { CommandPalette } from "./CommandPalette";
+import { CustomerWorkspace } from "./CustomerWorkspace";
 import { ThemeToggle } from "./theme";
 import {
   IssueLicense,
@@ -347,6 +348,7 @@ function Console({
     [command, setCommand] = useState(false),
     [revision, setRevision] = useState(0),
     [issue, setIssue] = useState(false),
+    [issueCustomer, setIssueCustomer] = useState<Customer | null>(null),
     [productForm, setProductForm] = useState<Product | "new" | null>(null),
     [customerForm, setCustomerForm] = useState<Customer | "new" | null>(null),
     [selected, setSelected] = useState<string | null>(null),
@@ -360,6 +362,8 @@ function Console({
     } | null>(null),
     [signingOut, setSigningOut] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
+  const customerId = route.match(/^customers\/([^/]+)$/)?.[1] ?? null,
+    pageRoute = customerId ? "customers" : route;
   const products = useLoad<{ items: Product[] }>("/admin/products", revision),
     canWrite = session.user.role !== "viewer",
     isOwner = session.user.role === "owner";
@@ -377,8 +381,8 @@ function Console({
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    document.title = `${navigation.find((item) => item.id === route)?.label ?? "Not found"} · Keydock`;
-  }, [route]);
+    document.title = `${navigation.find((item) => item.id === pageRoute)?.label ?? "Not found"} · Keydock`;
+  }, [route, pageRoute]);
   useEffect(() => {
     const shortcuts = (event: KeyboardEvent) => {
       if (
@@ -441,7 +445,14 @@ function Console({
   }, [mobile]);
   const notify: Notify = (text, kind = "success") => setToast({ text, kind });
   const refresh = () => setRevision((value) => value + 1),
-    openIssue = () => setIssue(true),
+    openIssue = () => {
+      setIssueCustomer(null);
+      setIssue(true);
+    },
+    openCustomerIssue = (customer: Customer) => {
+      setIssueCustomer(customer);
+      setIssue(true);
+    },
     openProduct = () => setProductForm("new"),
     openLicense = (license: License) => setSelected(license.id);
   const common = { revision, canWrite, notify },
@@ -454,7 +465,7 @@ function Console({
       .join("")
       .toUpperCase();
   let content;
-  switch (route) {
+  switch (pageRoute) {
     case "overview":
       content = (
         <OverviewPage
@@ -487,7 +498,17 @@ function Console({
       );
       break;
     case "customers":
-      content = (
+      content = customerId ? (
+        <CustomerWorkspace
+          key={customerId}
+          {...common}
+          customerId={customerId}
+          products={productList}
+          onEdit={setCustomerForm}
+          onIssue={openCustomerIssue}
+          onSelect={openLicense}
+        />
+      ) : (
         <CustomersPage
           {...common}
           onCreate={() => setCustomerForm("new")}
@@ -578,15 +599,15 @@ function Console({
         <nav aria-label="Workspace navigation">
           {navigation.map((item, index) => (
             <a
-              className={`${route === item.id ? "active" : ""} ${index === 5 ? "nav-separated" : ""}`}
+              className={`${pageRoute === item.id ? "active" : ""} ${index === 5 ? "nav-separated" : ""}`}
               href={`#/${item.id}`}
               onClick={() => setMobile(false)}
-              aria-current={route === item.id ? "page" : undefined}
+              aria-current={pageRoute === item.id ? "page" : undefined}
               key={item.id}
             >
               <item.icon size={18} />
               {item.label}
-              {route === item.id && <span className="nav-active-dot" />}
+              {pageRoute === item.id && <span className="nav-active-dot" />}
             </a>
           ))}
         </nav>
@@ -651,7 +672,7 @@ function Console({
             <span className="breadcrumb-root">Workspace</span>
             <ChevronRight size={13} />
             <span>
-              {navigation.find((item) => item.id === route)?.label ??
+              {navigation.find((item) => item.id === pageRoute)?.label ??
                 "Not found"}
             </span>
           </div>
@@ -711,6 +732,7 @@ function Console({
       {issue && (
         <IssueLicense
           products={productList}
+          initialCustomer={issueCustomer}
           onClose={() => setIssue(false)}
           onProduct={() => {
             setIssue(false);

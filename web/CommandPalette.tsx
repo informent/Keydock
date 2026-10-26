@@ -15,7 +15,7 @@ import {
 import { useDebouncedValue, useLoad } from "./api";
 import { ErrorBox, Modal } from "./components";
 import { useTheme } from "./theme";
-import type { License, Page } from "./types";
+import type { Customer, License, Page } from "./types";
 
 type Command = {
   id: string;
@@ -52,6 +52,14 @@ export function CommandPalette({
       ? `/admin/licenses?limit=5&search=${encodeURIComponent(stableQuery)}`
       : null;
   const licenses = useLoad<Page<License>>(licensePath);
+  const customerPath =
+    stableQuery.length >= 2
+      ? `/admin/customers?limit=5&search=${encodeURIComponent(stableQuery)}`
+      : null;
+  const customers = useLoad<Page<Customer>>(customerPath);
+  const searching =
+    query.length >= 2 &&
+    (query !== stableQuery || licenses.loading || customers.loading);
   const { theme, toggle } = useTheme(),
     listId = useId();
   const commands: Command[] = [
@@ -108,7 +116,7 @@ export function CommandPalette({
     query.length >= 2 &&
     stableQuery === query &&
     licenses.dataPath === licensePath &&
-    !licenses.loading &&
+    !searching &&
     !licenses.error
   ) {
     commands.push(
@@ -122,9 +130,27 @@ export function CommandPalette({
       })),
     );
   }
+  if (
+    query.length >= 2 &&
+    stableQuery === query &&
+    !searching &&
+    customers.dataPath === customerPath &&
+    !customers.error
+  ) {
+    commands.push(
+      ...(customers.data?.items ?? []).map((customer) => ({
+        id: `customer-${customer.id}`,
+        label: customer.name,
+        detail: `${customer.email} · ${customer.licenses} ${customer.licenses === 1 ? "license" : "licenses"}`,
+        group: "Customers",
+        icon: Users,
+        action: () => {
+          location.hash = `/customers/${customer.id}`;
+        },
+      })),
+    );
+  }
   const selected = Math.min(active, Math.max(commands.length - 1, 0));
-  const searching =
-    query.length >= 2 && (query !== stableQuery || licenses.loading);
   useEffect(() => setActive(0), [search]);
   useEffect(() => {
     document
@@ -139,7 +165,7 @@ export function CommandPalette({
   return (
     <Modal
       title="Search workspace"
-      description="Find a page, run an action, or jump to a license."
+      description="Find a page, customer, or license. Run an action."
       onClose={onClose}
       className="command-modal"
     >
@@ -231,7 +257,9 @@ export function CommandPalette({
         )}
         <ErrorBox
           error={
-            query.length >= 2 && stableQuery === query ? licenses.error : ""
+            query.length >= 2 && stableQuery === query
+              ? [licenses.error, customers.error].filter(Boolean).join(" ")
+              : ""
           }
         />
       </div>

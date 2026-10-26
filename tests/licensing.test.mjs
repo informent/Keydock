@@ -92,6 +92,234 @@ async function fixture(t) {
   };
 }
 
+test("customer profiles summarize effective license status and current devices across products", async (t) => {
+  const f = await fixture(t);
+  const createCustomer = async (name) => {
+    const response = await f.request("POST", "/admin/customers", {
+      name,
+      email: `${name.toLowerCase()}@example.test`,
+    });
+    assert.equal(response.statusCode, 201);
+    return response.json();
+  };
+  const customer = await createCustomer("Morgan"),
+    other = await createCustomer("River");
+  const empty = (await f.request("GET", `/admin/customers/${other.id}`)).json();
+  assert.equal(empty.licenses, 0);
+  assert.deepEqual(empty.summary, {
+    products: 0,
+    active: 0,
+    expired: 0,
+    expiring: 0,
+    suspended: 0,
+    revoked: 0,
+    latestLicenseAt: null,
+    devices: 0,
+    lastSeenAt: null,
+  });
+  const secondProduct = (
+    await f.request("POST", "/admin/products", {
+      name: "Second application",
+      slug: "second-app",
+    })
+  ).json();
+  const [lifetime] = await f.issue({ customerId: customer.id, maxDevices: 2 });
+  await f.issue({
+    customerId: customer.id,
+    productId: secondProduct.id,
+    expiresAt: f.time() + 86400000,
+  });
+  await f.issue({ customerId: customer.id, durationDays: 30 });
+  await f.issue({ customerId: customer.id, expiresAt: f.time() + 1000 });
+  for (const status of ["suspended", "revoked"]) {
+    const [license] = await f.issue({
+      customerId: customer.id,
+      expiresAt: f.time() + 1000,
+    });
+    assert.equal(
+      (
+        await f.request("POST", `/admin/licenses/${license.id}/status`, {
+          status,
+        })
+      ).statusCode,
+      200,
+    );
+  }
+  await f.issue();
+  const firstDevice = await f.client(lifetime.key, "customer-device-0001");
+  assert.equal(firstDevice.statusCode, 200);
+  assert.equal(
+    (await f.client(lifetime.key, "customer-device-0002")).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await f.request(
+        "DELETE",
+        `/admin/licenses/${lifetime.id}/devices/${firstDevice.json().activationId}`,
+      )
+    ).statusCode,
+    200,
+  );
+  f.advance(2000);
+  const response = await f.request("GET", `/admin/customers/${customer.id}`),
+    profile = response.json();
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.equal(profile.licenses, 6);
+  assert.deepEqual(profile.summary, {
+    products: 2,
+    active: 3,
+    expired: 1,
+    expiring: 1,
+    suspended: 1,
+    revoked: 1,
+    latestLicenseAt: f.time() - 2000,
+    devices: 1,
+    lastSeenAt: f.time() - 2000,
+  });
+  assert.equal(profile.now, f.time());
+  assert.equal(response.body.includes(lifetime.key), false);
+  assert.equal(response.body.includes("key_hash"), false);
+  assert.equal(
+    (
+      await f.request("PATCH", `/admin/licenses/${lifetime.id}`, {
+        customerId: other.id,
+      })
+    ).statusCode,
+    200,
+  );
+  const updated = (
+    await f.request("GET", `/admin/customers/${customer.id}`)
+  ).json();
+  assert.equal(updated.licenses, 5);
+  assert.equal(updated.summary.active, 2);
+  assert.equal(updated.summary.devices, 0);
+  const reassigned = (
+    await f.request("GET", `/admin/customers/${other.id}`)
+  ).json();
+  assert.equal(reassigned.licenses, 1);
+  assert.equal(reassigned.summary.devices, 1);
+});
+
+test("customer profiles require authentication and workspace scope while allowing viewer reads", async (t) => {
+  const f = await fixture(t);
+  const customer = (
+    await f.request("POST", "/admin/customers", {
+      name: "Customer",
+      email: "customer@example.test",
+      notes: "Visible to the workspace team",
+    })
+  ).json();
+  const path = `/api/v1/admin/customers/${customer.id}`;
+  assert.equal((await f.app.inject({ url: path })).statusCode, 401);
+  const viewer = (
+    await f.request("POST", "/admin/tokens", {
+      name: "Read-only workspace",
+      role: "viewer",
+    })
+  ).json();
+  const headers = { authorization: `Bearer ${viewer.token}` };
+  const read = await f.app.inject({ url: path, headers });
+  assert.equal(read.statusCode, 200);
+  assert.equal(read.json().notes, customer.notes);
+  assert.equal(
+    (
+      await f.app.inject({
+        method: "PUT",
+        url: path,
+        headers,
+        payload: { name: "Changed", email: "changed@example.test" },
+      })
+    ).statusCode,
+    403,
+  );
+  const scoped = (
+    await f.request("POST", "/admin/tokens", {
+      name: "Product integration",
+      role: "operator",
+      productId: f.productId,
+    })
+  ).json();
+  const denied = await f.app.inject({
+    url: path,
+    headers: { authorization: `Bearer ${scoped.token}` },
+  });
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.json().error.code, "SCOPE_DENIED");
+  assert.equal(
+    (
+      await f.request(
+        "GET",
+        "/admin/customers/00000000-0000-4000-8000-000000000001",
+      )
+    ).statusCode,
+    404,
+  );
+  assert.equal(
+    (await f.request("GET", "/admin/customers/not-a-customer")).statusCode,
+    400,
+  );
+});
+
+test("customer references are searchable literally and license filtering stays bound to the customer", async (t) => {
+  const f = await fixture(t);
+  const first = (
+    await f.request("POST", "/admin/customers", {
+      name: "First",
+      email: "first@example.test",
+      externalId: "invoice_100%\\complete",
+    })
+  ).json();
+  const second = (
+    await f.request("POST", "/admin/customers", {
+      name: "Second",
+      email: "second@example.test",
+      externalId: "invoiceX100other",
+    })
+  ).json();
+  for (const search of ["invoice_100%", "%", "\\complete"]) {
+    const result = (
+      await f.request(
+        "GET",
+        `/admin/customers?search=${encodeURIComponent(search)}`,
+      )
+    ).json();
+    assert.equal(result.total, 1);
+    assert.equal(result.items[0].id, first.id);
+  }
+  const page1 = (
+    await f.request("GET", "/admin/customers?search=invoice&limit=1&page=1")
+  ).json();
+  const page2 = (
+    await f.request("GET", "/admin/customers?search=invoice&limit=1&page=2")
+  ).json();
+  assert.equal(page1.total, 2);
+  assert.equal(page2.total, 2);
+  assert.notEqual(page1.items[0].id, page2.items[0].id);
+  const licenses = await f.issue({ customerId: first.id, count: 2 });
+  const [unrelated] = await f.issue({ customerId: second.id });
+  const filtered = (
+    await f.request(
+      "GET",
+      `/admin/licenses?customerId=${first.id}&limit=1&page=2`,
+    )
+  ).json();
+  assert.equal(filtered.total, 2);
+  assert.equal(filtered.items.length, 1);
+  assert.equal(filtered.items[0].customerId, first.id);
+  const exported = await f.request(
+    "GET",
+    `/admin/licenses/export?customerId=${first.id}`,
+  );
+  assert.equal(exported.statusCode, 200);
+  assert.equal(exported.body.includes(unrelated.id), false);
+  for (const license of licenses) {
+    assert.equal(exported.body.includes(license.id), true);
+    assert.equal(exported.body.includes(license.key), false);
+  }
+});
+
 test("activation issues a pinned, device-bound lease and persists only hashed keys", async (t) => {
   const f = await fixture(t),
     [license] = await f.issue();

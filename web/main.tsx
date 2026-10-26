@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ThemeProvider, readTheme } from "./theme";
 import "./styles.css";
+import "./customer-workspace.css";
 
 document.documentElement.dataset.theme = readTheme();
 
