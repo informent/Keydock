@@ -14,6 +14,8 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Rows3,
   Settings,
   Search,
@@ -170,17 +172,17 @@ function Authentication({
       <section className="auth-intro">
         <Brand />
         <div className="auth-story">
-          <span className="auth-kicker">LICENSING, ON YOUR TERMS</span>
+          <span className="auth-kicker">THE KEYDOCK CONSOLE</span>
           <h1>
-            Your software.
+            A workspace
             <br />
-            Your keys.
+            for your
             <br />
-            <span>Your control.</span>
+            <span>software.</span>
           </h1>
           <p>
-            A home for every product, license, and customer. Built to run on
-            infrastructure you own.
+            Issue keys, manage customer access, and keep your products running.
+            All on infrastructure you own.
           </p>
           <div className="auth-points">
             <span>
@@ -345,6 +347,13 @@ function Console({
   const readRoute = () =>
     location.hash.replace(/^#\/?/, "").split("?")[0] || "overview";
   const [route, setRoute] = useState(readRoute),
+    [collapsed, setCollapsed] = useState(() => {
+      try {
+        return localStorage.getItem("keydock:sidebar-collapsed") === "true";
+      } catch {
+        return false;
+      }
+    }),
     [compact, setCompact] = useState(() => {
       try {
         return localStorage.getItem("keydock:compact-tables") !== "false";
@@ -370,6 +379,13 @@ function Console({
     } | null>(null),
     [signingOut, setSigningOut] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    try {
+      localStorage.setItem("keydock:sidebar-collapsed", String(collapsed));
+    } catch {
+      // Navigation remains usable when browser storage is unavailable.
+    }
+  }, [collapsed]);
   useEffect(() => {
     try {
       localStorage.setItem("keydock:compact-tables", String(compact));
@@ -572,6 +588,7 @@ function Console({
     <div
       className="app-shell"
       data-density={compact ? "compact" : "comfortable"}
+      data-sidebar={collapsed ? "collapsed" : "expanded"}
     >
       <a
         className="skip-link"
@@ -591,6 +608,7 @@ function Console({
         />
       )}
       <aside
+        id="workspace-sidebar"
         ref={sidebar}
         className={`sidebar ${mobile ? "open" : ""}`}
         aria-label="Workspace sidebar"
@@ -606,14 +624,16 @@ function Console({
           </button>
         </div>
         <div className="workspace-switch">
-          <span className="workspace-icon">K</span>
+          <span className="workspace-icon">
+            <ShieldCheck size={17} />
+          </span>
           <div>
-            <strong>Licensing console</strong>
-            <span>Self-hosted instance</span>
+            <strong>Your workspace</strong>
+            <span>Keydock {meta.version}</span>
           </div>
           <span className="workspace-dot" />
         </div>
-        <div className="nav-label">WORKSPACE</div>
+        <div className="nav-label">CONSOLE</div>
         <nav aria-label="Workspace navigation">
           {navigation.map((item, index) => (
             <a
@@ -621,30 +641,28 @@ function Console({
               href={`#/${item.id}`}
               onClick={() => setMobile(false)}
               aria-current={pageRoute === item.id ? "page" : undefined}
+              aria-label={item.label}
+              title={collapsed ? item.label : undefined}
               key={item.id}
             >
               <item.icon size={18} />
-              {item.label}
+              <span className="nav-text">{item.label}</span>
               {pageRoute === item.id && <span className="nav-active-dot" />}
             </a>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="instance-card">
-            <ShieldCheck size={19} />
-            <strong>Instance settings</strong>
-            <a href="#/settings" onClick={() => setMobile(false)}>
-              Manage instance <ArrowRight size={14} />
-            </a>
-          </div>
+          <div className="sidebar-caption">YOUR SOFTWARE. YOUR KEYS.</div>
           <a
             className="sidebar-docs"
             href="https://github.com/informent/Keydock"
             target="_blank"
             rel="noreferrer"
+            aria-label="Documentation"
+            title={collapsed ? "Documentation" : undefined}
           >
             <Code2 size={16} />
-            Documentation
+            <span className="nav-text">Documentation</span>
             <ExternalLink size={13} />
           </a>
           <div className="sidebar-user">
@@ -677,13 +695,27 @@ function Console({
         <header className="topbar">
           <div>
             <button
+              className="icon-button sidebar-toggle"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              aria-controls="workspace-sidebar"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => setCollapsed((value) => !value)}
+            >
+              {collapsed ? (
+                <PanelLeftOpen size={18} />
+              ) : (
+                <PanelLeftClose size={18} />
+              )}
+            </button>
+            <button
               className="icon-button mobile-menu"
               aria-label="Open navigation"
               onClick={() => setMobile(true)}
             >
               <Menu size={21} />
             </button>
-            <span className="breadcrumb-root">Workspace</span>
+            <span className="breadcrumb-root">Console</span>
             <ChevronRight size={13} />
             <span>
               {navigation.find((item) => item.id === pageRoute)?.label ??
@@ -733,7 +765,10 @@ function Console({
           <ErrorBox error={products.error} />
           {content}
           <footer className="content-footer">
-            <span>Keydock · Licensing infrastructure you own.</span>
+            <span>
+              Keydock {meta.version} <span className="footer-divider">/</span>{" "}
+              Self-hosted licensing
+            </span>
             <a
               href="https://github.com/informent/Keydock/blob/main/LICENSE"
               target="_blank"

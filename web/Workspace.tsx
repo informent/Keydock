@@ -101,9 +101,9 @@ export function OverviewPage({
   return (
     <>
       <PageTitle
-        eyebrow="YOUR LICENSING WORKSPACE"
+        eyebrow="WORKSPACE OVERVIEW"
         title="Overview"
-        text={`Welcome back, ${userName.split(/\s+/)[0]}. Review licenses, devices, and recent requests.`}
+        text={`${userName.split(/\s+/)[0]}, here’s what’s happening with your software.`}
         actions={
           canWrite ? (
             <button className="button primary" onClick={onIssue}>
@@ -117,50 +117,121 @@ export function OverviewPage({
       <Stats data={data} />
       <div className="overview-grid">
         <RequestActivity data={data} />
-        <section className="panel setup-card">
-          <div className="section-heading">
-            <div>
-              <h2>
-                {steps.every((s) => s.complete)
-                  ? "Workspace shortcuts"
-                  : "Get started"}
-              </h2>
-              <p>Products, keys, and application access.</p>
+        {data && data.licenses > 0 ? (
+          <section className="panel license-health" aria-label="License health">
+            <div className="section-heading">
+              <div>
+                <h2>License health</h2>
+                <p>A snapshot of your issued keys.</p>
+              </div>
+              <ShieldCheck size={19} />
             </div>
-            <Box size={21} />
-          </div>
-          {steps.map((step, index) => (
-            <button
-              key={step.title}
-              className="setup-step"
-              onClick={step.action}
-              disabled={
-                !canWrite && (index === 1 || (index === 0 && !data?.products))
-              }
-            >
+            <div className="health-total">
+              <strong>{number(data.licenses)}</strong>
+              <span>total licenses</span>
+            </div>
+            <div className="health-bar" aria-hidden="true">
+              <span className="health-active" style={{ flex: data.active }} />
+              <span className="health-expired" style={{ flex: data.expired }} />
               <span
-                className={`step-number ${step.complete ? "complete" : ""}`}
-              >
-                {step.complete ? <Check size={15} /> : index + 1}
-              </span>
+                className="health-other"
+                style={{
+                  flex: Math.max(0, data.licenses - data.active - data.expired),
+                }}
+              />
+            </div>
+            <dl className="health-breakdown">
+              <div>
+                <dt>
+                  <i className="health-active" />
+                  Active
+                </dt>
+                <dd>{number(data.active)}</dd>
+              </div>
+              <div>
+                <dt>
+                  <i className="health-expired" />
+                  Expired
+                </dt>
+                <dd>{number(data.expired)}</dd>
+              </div>
+              <div>
+                <dt>
+                  <i className="health-other" />
+                  Suspended or revoked
+                </dt>
+                <dd>
+                  {number(
+                    Math.max(0, data.licenses - data.active - data.expired),
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <div className="health-expiry">
               <span>
-                <strong>{step.title}</strong>
-                <small>{step.text}</small>
+                {data.expiring
+                  ? `${number(data.expiring)} expiring in 7 days`
+                  : "No expirations in the next 7 days"}
               </span>
-              <ArrowUpRight size={16} />
-            </button>
-          ))}
-          <div className="setup-footer">
-            <ShieldCheck size={16} />
-            Licenses are managed on your instance.
-          </div>
-        </section>
+              <a href="#/licenses" aria-label="Review licenses">
+                <ArrowRight size={16} />
+              </a>
+            </div>
+            <div className="health-links">
+              <a href="#/products">
+                Manage products <ArrowUpRight size={14} />
+              </a>
+              <a href="#/developers">
+                Developer tools <ArrowUpRight size={14} />
+              </a>
+            </div>
+          </section>
+        ) : (
+          <section className="panel setup-card">
+            <div className="section-heading">
+              <div>
+                <h2>
+                  {steps.every((s) => s.complete)
+                    ? "Workspace shortcuts"
+                    : "Get started"}
+                </h2>
+                <p>Products, keys, and application access.</p>
+              </div>
+              <Box size={21} />
+            </div>
+            {steps.map((step, index) => (
+              <button
+                key={step.title}
+                className="setup-step"
+                onClick={step.action}
+                disabled={
+                  !canWrite && (index === 1 || (index === 0 && !data?.products))
+                }
+              >
+                <span
+                  className={`step-number ${step.complete ? "complete" : ""}`}
+                >
+                  {step.complete ? <Check size={15} /> : index + 1}
+                </span>
+                <span>
+                  <strong>{step.title}</strong>
+                  <small>{step.text}</small>
+                </span>
+                <ArrowUpRight size={16} />
+              </button>
+            ))}
+            <div className="setup-footer">
+              <ShieldCheck size={16} />
+              Licenses are managed on your instance.
+            </div>
+          </section>
+        )}
       </div>
-      <section className="panel">
+      <section className="panel recent-licenses">
         <div className="section-heading">
           <div>
             <h2>Recently issued</h2>
-            <p>The latest additions to your workspace.</p>
+            <p>Your five most recent licenses.</p>
           </div>
           <a className="text-link" href="#/licenses">
             All licenses

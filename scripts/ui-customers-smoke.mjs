@@ -121,11 +121,26 @@ try {
       .locator(".toast-region")
       .evaluate((region) => region.querySelector("button")?.click());
     await expect(page.locator(".toast")).toHaveCount(0);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((done) =>
+        requestAnimationFrame(() => requestAnimationFrame(done)),
+      );
+      window.scrollTo(0, 0);
+    });
+    const dimensions = await page.evaluate(() => ({
+      width: innerWidth,
+      height: document.documentElement.scrollHeight,
+    }));
+    const capture = await page.screenshot({
       path: resolve("docs/images", name),
       fullPage: true,
     });
+    assert.equal(capture.readUInt32BE(16), dimensions.width);
+    assert.ok(
+      capture.readUInt32BE(20) >= dimensions.height,
+      `${name}: screenshot must include the complete page`,
+    );
   }
   async function login(target, email, password) {
     await target.getByLabel("Email address", { exact: true }).fill(email);

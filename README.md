@@ -2,7 +2,7 @@
 
 **Licensing infrastructure you own.** An MIT-licensed, self-hosted key system for software developers and tool owners.
 
-Keydock includes a responsive admin console, licensing API, and JavaScript/Python clients. This is an early release; it has not undergone an independent security audit.
+Keydock includes an admin console designed for desktop, a licensing API, and JavaScript/Python clients. This is an early release; it has not undergone an independent security audit.
 
 ![Keydock customer workspace](docs/images/customer-workspace.png)
 
@@ -25,7 +25,8 @@ _A customer workspace connected to a real local instance, with illustrative reco
 ## Available now
 
 - A responsive console with guided owner setup, overview, licenses, products, customers, activity, developer integration and team settings.
-- Light and dark themes, keyboard workspace search, interactive request history, and mobile license cards.
+- Light and dark themes, a collapsible desktop sidebar, compact tables, keyboard workspace search, interactive request history, and mobile license cards.
+- A license-health overview and a desktop side inspector for license details, devices, and access changes.
 - A live issuance summary for product, customer, expiry, entitlements, and device capacity before creating a batch.
 - Customer workspaces with assigned licenses, device and expiry totals, team notes, filtered exports, and direct profile links.
 - Products, customers and batch license issuance (up to 100 keys per request).
@@ -63,9 +64,9 @@ Create a backup with `npm run backup`, check it with `npm run backup:verify -- B
 
 Press **Ctrl+K** (Windows/Linux) or **⌘K** (Mac) to jump to a page, find a license, open a customer by name/email/reference, or start an action allowed by your role. Use the arrow keys and Enter to select a result; Escape closes the dialog and returns focus. Record search begins after two characters.
 
-The theme button switches between light and dark appearances. Your first visit follows the browser's preferred color scheme; your choice is then saved in that browser and shared across tabs. On desktop, the **Compact tables** button beside the theme control switches between compact and comfortable rows. The choice is saved in that browser. The console keeps four overview metrics side by side on desktop and uses wider customer workspaces for license records and account details. On phones, licenses become readable cards with the same details and actions as the desktop table.
+The theme button switches between light and dark appearances. Your first visit follows the browser's preferred color scheme; your choice is then saved in that browser and shared across tabs. On desktop, the **Compact tables** button beside the theme control switches between compact and comfortable rows. **Collapse sidebar** gives the records more room while keeping navigation available through labeled icons. Both choices are saved in that browser. The console keeps four overview metrics side by side on desktop and uses wider customer workspaces for license records and account details. On phones, licenses become readable cards with the same details and actions as the desktop table.
 
-The overview shows actual activation and validation counts over seven or fourteen days. Hover over the chart, or focus it and use the arrow keys, to inspect daily totals. The license workspace includes product/status filters, customer search, and a single **Clear filters** action.
+The overview shows actual activation and validation counts over seven or fourteen days. Hover over the chart, or focus it and use the arrow keys, to inspect daily totals. Once a license has been issued, the license-health panel summarizes active, expired, and suspended or revoked licenses. New workspaces retain setup guidance. The license workspace includes product/status filters, customer search, and a single **Clear filters** action. Opening a license on desktop shows its details in a side inspector; smaller screens use a dialog. Both support Escape to close and restore keyboard focus.
 
 License creation includes a live [issuance summary](docs/images/issue-license.png). Review the number of keys, devices per key, total device capacity, validity, customer, entitlements, and the product's offline lease duration before generating the batch. Searching for another customer preserves your current assignment until you change it.
 
