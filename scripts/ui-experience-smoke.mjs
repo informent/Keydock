@@ -374,6 +374,7 @@ try {
     .getByRole("button", { name: "Clear filters", exact: true })
     .click();
   await settled();
+  await expect(page.locator(".license-table tbody tr")).toHaveCount(6);
   await screenshot("licenses.png");
 
   await theme("dark");
